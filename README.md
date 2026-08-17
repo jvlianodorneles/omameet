@@ -86,6 +86,12 @@ omameet sync
 # Join current or next upcoming meeting with 1 command
 omameet join
 
+# Copy meeting link to clipboard
+omameet copy-link
+
+# Mute microphone
+omameet mute-mic
+
 # Display next meeting details
 omameet next
 
@@ -112,6 +118,9 @@ Add these lines to `~/.config/hypr/bindings.lua`:
 -- Join next meeting with Super + Alt + M
 o.bind("$mainMod ALT, M", function() hl.exec("omameet join") end)
 
+-- Copy next meeting link with Super + Alt + C
+o.bind("$mainMod ALT, C", function() hl.exec("omameet copy-link") end)
+
 -- Toggle agenda popup with Super + Alt + A
 o.bind("$mainMod ALT, A", function() hl.exec("omarchy-shell shell toggle dorneles.omameet") end)
 ```
@@ -124,12 +133,15 @@ In `~/.config/omarchy/shell.json` (or via Omarchy settings panel):
 
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `format` | `enum` | `"icon_title_countdown"` | Text display format (`icon_title_countdown`, `icon_countdown`, `icon_time`, `title_only`, `icon_only`) |
+| `format` | `enum` | `"title_countdown"` | Text display format (`title_countdown`, `icon_title_countdown`, `countdown_only`, `icon_time`, `title_only`, `icon_only`) |
 | `maxTitleLength` | `int` | `35` | Maximum title character limit on the status bar |
 | `marqueeEnabled` | `bool` | `false` | Enable smooth marquee scrolling when title exceeds character limit |
 | `marqueeSpeed` | `int` | `6` | Marquee animation cycle duration in seconds |
 | `showIcon` | `bool` | `true` | Show platform / calendar icon |
 | `showCountdown` | `bool` | `true` | Show countdown timer (`in 15m`, `20m left`) |
+| `pauseMusicOnJoin` | `bool` | `true` | Automatically pause Spotify/MPRIS media players when joining a call |
+| `muteMicOnJoin` | `bool` | `false` | Automatically mute default microphone capture device when joining a call |
+| `hideDeclined` | `bool` | `true` | Filter out declined or cancelled calendar events |
 | `refreshIntervalMin` | `int` | `15` | Automatic background calendar sync interval in minutes |
 | `urgentThresholdMin` | `int` | `5` | Minutes before meeting start for urgent highlight on the bar |
 | `enableNotifications` | `bool` | `true` | Send desktop notifications before meetings start |
@@ -142,3 +154,4 @@ In `~/.config/omarchy/shell.json` (or via Omarchy settings panel):
 ## 📄 License
 
 Distributed under the MIT License. See [LICENSE](LICENSE) for details.
+

@@ -36,6 +36,7 @@
       "hideTentative": false,
       "hidePending": false,
       "pauseMusicOnJoin": true,
+      "muteMicOnJoin": false,
       "preferredBrowser": "",
       "openInNativeApp": false
     },
@@ -112,6 +113,13 @@
         "label": "Pause Music When Joining",
         "defaultValue": true,
         "description": "Automatically pause active MPRIS media players (Spotify, browser, etc.) when joining a meeting."
+      },
+      {
+        "key": "muteMicOnJoin",
+        "type": "boolean",
+        "label": "Mute Microphone When Joining",
+        "defaultValue": false,
+        "description": "Automatically mute the system microphone capture source when joining a meeting."
       },
       {
         "key": "hideDeclined",

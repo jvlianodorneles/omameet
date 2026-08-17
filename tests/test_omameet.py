@@ -140,5 +140,20 @@ END:VCALENDAR"""
         self.assertTrue(evts[0]["is_declined"])
         self.assertTrue(evts[1]["is_declined"])
 
+class TestSystemIntegrations(unittest.TestCase):
+    def test_clipboard_helper_empty(self):
+        # Empty text should return False
+        self.assertFalse(omameet.copy_to_clipboard(""))
+
+    def test_mute_microphone_callable(self):
+        # Function should execute without throwing uncaught exceptions
+        try:
+            omameet.mute_microphone()
+            ran = True
+        except Exception:
+            ran = False
+        self.assertTrue(ran)
+
 if __name__ == "__main__":
     unittest.main()
+

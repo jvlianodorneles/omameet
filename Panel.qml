@@ -43,6 +43,7 @@ Panel {
   property bool marqueeEnabledState: hostWidget ? hostWidget.currentMarqueeEnabled : false
   property bool notificationsEnabledState: hostWidget ? hostWidget.currentEnableNotifications : true
   property bool pauseMusicState: true
+  property bool muteMicState: false
   property bool hideDeclinedState: true
 
   onHostWidgetChanged: {
@@ -107,6 +108,12 @@ Panel {
     }
   }
 
+  function copyMeetingLink(url) {
+    if (url && syncScriptPath !== "") {
+      Quickshell.execDetached(["python3", syncScriptPath, "copy-link", url])
+    }
+  }
+
   function joinNextMeeting() {
     if (nextMeeting && nextMeeting.videoUrl) {
       joinMeeting(nextMeeting.videoUrl)
@@ -130,6 +137,7 @@ Panel {
         root.feedsList = parsed.feeds || []
         if (parsed.settings) {
           root.pauseMusicState = parsed.settings.pauseMusicOnJoin !== false
+          root.muteMicState = parsed.settings.muteMicOnJoin === true
           root.hideDeclinedState = parsed.settings.hideDeclined !== false
           if (parsed.settings.maxTitleLength !== undefined) {
             root.maxTitleLengthState = Number(parsed.settings.maxTitleLength) || 35
@@ -207,6 +215,11 @@ Panel {
     updateWidgetSetting("pauseMusicOnJoin", pauseMusicState)
   }
 
+  function toggleMuteMic() {
+    muteMicState = !muteMicState
+    updateWidgetSetting("muteMicOnJoin", muteMicState)
+  }
+
   function toggleHideDeclined() {
     hideDeclinedState = !hideDeclinedState
     updateWidgetSetting("hideDeclined", hideDeclinedState)
@@ -227,7 +240,7 @@ Panel {
     owner: root.barIdentity
     bar: root.bar
     open: root.opened
-    contentWidth: root.inSettingsView ? Style.space(370) : Style.space(290)
+    contentWidth: root.inSettingsView ? Style.space(380) : Style.space(295)
     contentHeight: root.inSettingsView ? (settingsColumn.implicitHeight + Style.space(24)) : (contentColumn.implicitHeight + Style.space(24))
 
     PanelKeyCatcher {
@@ -411,7 +424,37 @@ Panel {
           }
         }
 
-        // 4. Desktop Reminders Switch (Borderless)
+        // 4. Mute Microphone Switch (Borderless)
+        Item {
+          width: parent.width
+          height: Style.space(28)
+
+          MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.toggleMuteMic()
+          }
+
+          RowLayout {
+            anchors.fill: parent
+            spacing: Style.space(8)
+
+            Text {
+              Layout.fillWidth: true
+              text: "Mute microphone on call join"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body * 0.95
+            }
+
+            ToggleSwitch {
+              checked: root.muteMicState
+              interactive: false
+            }
+          }
+        }
+
+        // 5. Desktop Reminders Switch (Borderless)
         Item {
           width: parent.width
           height: Style.space(28)
@@ -441,7 +484,7 @@ Panel {
           }
         }
 
-        // 5. Hide Declined Switch (Borderless)
+        // 6. Hide Declined Switch (Borderless)
         Item {
           width: parent.width
           height: Style.space(28)
@@ -739,7 +782,17 @@ Panel {
               anchors.fill: parent
               anchors.leftMargin: Style.space(6)
               anchors.rightMargin: Style.space(6)
-              spacing: Style.space(8)
+              spacing: Style.space(6)
+
+              // Calendar Color Indicator Pill
+              Rectangle {
+                width: Style.space(3)
+                height: Style.space(12)
+                radius: Style.space(2)
+                color: modelData.feedColor || "#3B82F6"
+                opacity: eventRow.isPast ? 0.35 : 0.9
+                Layout.alignment: Qt.AlignVCenter
+              }
 
               // Start Time
               Text {
@@ -749,7 +802,7 @@ Panel {
                 font.pixelSize: Style.font.body * 0.95
                 font.bold: eventRow.isSelectedMeeting
                 opacity: eventRow.isPast ? 0.5 : 1.0
-                Layout.preferredWidth: Style.space(44)
+                Layout.preferredWidth: Style.space(42)
               }
 
               // Event Title
@@ -762,6 +815,20 @@ Panel {
                 font.bold: eventRow.isSelectedMeeting
                 elide: Text.ElideRight
                 opacity: eventRow.isPast ? 0.5 : 1.0
+              }
+
+              // Copy Meeting Link Quick Button (appears on row hover / active)
+              Button {
+                visible: modelData.hasLink && (eventRow.isHovered || eventRow.isSelectedMeeting)
+                implicitWidth: Style.space(20)
+                implicitHeight: Style.space(20)
+                iconText: "󰆏"
+                tooltipText: "Copy meeting link to clipboard"
+                accent: eventRow.isSelectedMeeting ? "#FFFFFF" : Color.accent
+                foreground: eventRow.isSelectedMeeting ? "#FFFFFF" : root.foreground
+                onClicked: {
+                  root.copyMeetingLink(modelData.videoUrl)
+                }
               }
 
               // Meeting Video Provider Icon
@@ -925,6 +992,16 @@ Panel {
                 elide: Text.ElideRight
               }
 
+              // Copy bookmark link button
+              Button {
+                visible: mouseBm.containsMouse
+                implicitWidth: Style.space(18)
+                implicitHeight: Style.space(18)
+                iconText: "󰆏"
+                tooltipText: "Copy room link"
+                onClicked: root.copyMeetingLink(modelData.url)
+              }
+
               Text {
                 text: "󰌹"
                 color: Color.muted
@@ -991,14 +1068,24 @@ Panel {
               anchors.fill: parent
               anchors.leftMargin: Style.space(6)
               anchors.rightMargin: Style.space(6)
-              spacing: Style.space(8)
+              spacing: Style.space(6)
+
+              // Calendar Color Indicator Pill
+              Rectangle {
+                width: Style.space(3)
+                height: Style.space(12)
+                radius: Style.space(2)
+                color: modelData.feedColor || "#3B82F6"
+                opacity: 0.7
+                Layout.alignment: Qt.AlignVCenter
+              }
 
               Text {
                 text: modelData.isAllDay ? "All Day" : modelData.start
                 color: Color.muted
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
-                Layout.preferredWidth: Style.space(44)
+                Layout.preferredWidth: Style.space(42)
               }
 
               Text {
@@ -1008,6 +1095,15 @@ Panel {
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body * 0.95
                 elide: Text.ElideRight
+              }
+
+              Button {
+                visible: modelData.hasLink && mouseTomorrow.containsMouse
+                implicitWidth: Style.space(18)
+                implicitHeight: Style.space(18)
+                iconText: "󰆏"
+                tooltipText: "Copy meeting link"
+                onClicked: root.copyMeetingLink(modelData.videoUrl)
               }
 
               Text {

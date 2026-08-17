@@ -190,6 +190,41 @@ def pause_media_players():
     except Exception:
         pass
 
+def mute_microphone():
+    """Mutes the default audio capture device/mic via wpctl or pactl."""
+    if shutil.which("wpctl"):
+        try:
+            subprocess.run(["wpctl", "set-mute", "@DEFAULT_AUDIO_SOURCE@", "1"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=1)
+            return
+        except Exception:
+            pass
+    if shutil.which("pactl"):
+        try:
+            subprocess.run(["pactl", "set-source-mute", "@DEFAULT_SOURCE@", "1"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=1)
+            return
+        except Exception:
+            pass
+
+def copy_to_clipboard(text: str):
+    """Copies text to system clipboard via wl-copy or xclip."""
+    if not text:
+        return False
+    if shutil.which("wl-copy"):
+        try:
+            p = subprocess.Popen(["wl-copy"], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            p.communicate(text.encode("utf-8"))
+            return True
+        except Exception:
+            pass
+    if shutil.which("xclip"):
+        try:
+            p = subprocess.Popen(["xclip", "-selection", "clipboard"], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            p.communicate(text.encode("utf-8"))
+            return True
+        except Exception:
+            pass
+    return False
+
 def run_join_hooks(url: str, provider_id: str, summary: str):
     """Executes user-defined meeting-join hooks if present."""
     if os.path.isfile(HOOK_JOIN_SCRIPT) and os.access(HOOK_JOIN_SCRIPT, os.X_OK):
@@ -205,6 +240,9 @@ def launch_url(url: str, provider_id: str = "web", summary: str = "Meeting"):
 
     if settings.get("pauseMusicOnJoin", True):
         pause_media_players()
+
+    if settings.get("muteMicOnJoin", False):
+        mute_microphone()
 
     run_join_hooks(url, provider_id, summary)
 
@@ -850,6 +888,26 @@ def main():
     if cmd in ("sync", "refresh", "s"):
         state = run_sync()
         print(json.dumps(state, indent=2, ensure_ascii=False))
+
+    elif cmd in ("copy-link", "copy", "cp"):
+        if len(sys.argv) < 3:
+            state = load_state()
+            next_m = state.get("nextMeeting")
+            if next_m and next_m.get("videoUrl"):
+                url = next_m["videoUrl"]
+            else:
+                print("[omameet] Usage: omameet-sync.py copy-link <url>", file=sys.stderr)
+                sys.exit(1)
+        else:
+            url = sys.argv[2]
+        if copy_to_clipboard(url):
+            print(f"[omameet] Copied meeting link to clipboard: {url}")
+        else:
+            print(f"[omameet] Unable to copy (wl-copy or xclip not found): {url}")
+
+    elif cmd in ("mute-mic", "mute"):
+        mute_microphone()
+        print("[omameet] Default microphone muted.")
 
     elif cmd in ("join", "j", "join-next"):
         action_join_next()
