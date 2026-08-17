@@ -718,7 +718,7 @@ Panel {
           id: heroCard
           visible: root.nextMeeting && (root.nextMeeting.status === "ongoing" || root.nextMeeting.status === "soon")
           width: parent.width
-          height: Style.space(48)
+          height: Style.space(54)
           radius: Style.space(6)
           color: root.nextMeeting && root.nextMeeting.status === "ongoing" ? Qt.rgba(0.9, 0.2, 0.2, 0.16) : Qt.rgba(0.2, 0.5, 0.9, 0.16)
           border.color: root.nextMeeting && root.nextMeeting.status === "ongoing" ? Color.urgent : Color.accent
@@ -726,12 +726,15 @@ Panel {
 
           RowLayout {
             anchors.fill: parent
-            anchors.margins: Style.space(6)
+            anchors.leftMargin: Style.space(10)
+            anchors.rightMargin: Style.space(10)
+            anchors.topMargin: Style.space(6)
+            anchors.bottomMargin: Style.space(6)
             spacing: Style.space(8)
 
             ColumnLayout {
               Layout.fillWidth: true
-              spacing: Style.space(1)
+              spacing: Style.space(2)
 
               RowLayout {
                 spacing: Style.space(4)
@@ -749,7 +752,7 @@ Panel {
                 text: root.nextMeeting ? (root.nextMeeting.summary + " (" + root.nextMeeting.start + " - " + root.nextMeeting.end + ")") : ""
                 color: root.foreground
                 font.family: root.fontFamily
-                font.pixelSize: Style.font.body * 0.92
+                font.pixelSize: Style.font.body * 0.95
                 font.bold: true
                 elide: Text.ElideRight
               }
@@ -767,8 +770,8 @@ Panel {
 
             // Join Now Button
             Button {
-              implicitWidth: Style.space(70)
-              implicitHeight: Style.space(26)
+              implicitWidth: Style.space(68)
+              implicitHeight: Style.space(28)
               text: "Join"
               iconText: "󰐊"
               accent: root.nextMeeting && root.nextMeeting.status === "ongoing" ? Color.urgent : Color.accent
@@ -777,6 +780,12 @@ Panel {
               onClicked: root.joinNextMeeting()
             }
           }
+        }
+
+        Item {
+          visible: heroCard.visible
+          width: parent.width
+          height: Style.space(4)
         }
 
         // 2. TIMELINE: Today Section Header
@@ -1183,7 +1192,7 @@ Panel {
               text: "omameet"
               color: Color.muted
               font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
+              font.pixelSize: Style.font.body * 0.95
             }
 
             Button {
