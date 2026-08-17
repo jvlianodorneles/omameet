@@ -20,7 +20,7 @@
     "defaultSection": "right",
     "defaults": {
       "format": "title_countdown",
-      "maxTitleLength": 25,
+      "maxTitleLength": 35,
       "fontSize": 0,
       "marqueeEnabled": false,
       "marqueeSpeed": 6,
@@ -72,7 +72,7 @@
         "min": 5,
         "max": 80,
         "step": 1,
-        "defaultValue": 25,
+        "defaultValue": 35,
         "description": "Maximum number of characters allowed for the meeting title before truncation or marquee."
       },
       {

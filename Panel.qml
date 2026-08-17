@@ -39,7 +39,7 @@ Panel {
   property string newBmUrl: ""
 
   // Settings tracked locally for reactive instant UI response
-  property int maxTitleLengthState: hostWidget ? (hostWidget.currentMaxTitleLength || 25) : 25
+  property int maxTitleLengthState: hostWidget ? (hostWidget.currentMaxTitleLength || 35) : 35
   property bool marqueeEnabledState: hostWidget ? hostWidget.currentMarqueeEnabled : false
   property bool notificationsEnabledState: hostWidget ? hostWidget.currentEnableNotifications : true
   property bool pauseMusicState: true
@@ -47,7 +47,7 @@ Panel {
 
   onHostWidgetChanged: {
     if (hostWidget) {
-      maxTitleLengthState = hostWidget.currentMaxTitleLength || 25
+      maxTitleLengthState = hostWidget.currentMaxTitleLength || 35
       marqueeEnabledState = hostWidget.currentMarqueeEnabled
       notificationsEnabledState = hostWidget.currentEnableNotifications
     }
@@ -71,7 +71,7 @@ Panel {
   function open() {
     inSettingsView = false
     if (hostWidget) {
-      maxTitleLengthState = hostWidget.currentMaxTitleLength || 25
+      maxTitleLengthState = hostWidget.currentMaxTitleLength || 35
       marqueeEnabledState = hostWidget.currentMarqueeEnabled
       notificationsEnabledState = hostWidget.currentEnableNotifications
     }
@@ -132,7 +132,7 @@ Panel {
           root.pauseMusicState = parsed.settings.pauseMusicOnJoin !== false
           root.hideDeclinedState = parsed.settings.hideDeclined !== false
           if (parsed.settings.maxTitleLength !== undefined) {
-            root.maxTitleLengthState = Number(parsed.settings.maxTitleLength) || 25
+            root.maxTitleLengthState = Number(parsed.settings.maxTitleLength) || 35
           }
         }
       } catch (e) {}
@@ -188,8 +188,8 @@ Panel {
   }
 
   function resetMaxTitleLength() {
-    root.maxTitleLengthState = 25
-    updateWidgetSetting("maxTitleLength", 25)
+    root.maxTitleLengthState = 35
+    updateWidgetSetting("maxTitleLength", 35)
   }
 
   function toggleMarquee() {
@@ -338,14 +338,14 @@ Panel {
               onClicked: if (enabled) root.changeMaxTitleLength(5)
             }
 
-            // Reset Button [↺] - ALWAYS VISIBLE, disabled when already 25
+            // Reset Button [↺] - ALWAYS VISIBLE, disabled when already 35
             Button {
               implicitWidth: Style.space(24)
               implicitHeight: Style.space(24)
               iconText: "↺"
-              enabled: root.maxTitleLengthState !== 25
+              enabled: root.maxTitleLengthState !== 35
               opacity: enabled ? 1.0 : 0.35
-              tooltipText: enabled ? "Reset to default (25 chars)" : ""
+              tooltipText: enabled ? "Reset to default (35 chars)" : ""
               onClicked: if (enabled) root.resetMaxTitleLength()
             }
           }

@@ -35,7 +35,7 @@ DEFAULT_CONFIG = {
     ],
     "settings": {
         "format": "title_countdown",
-        "maxTitleLength": 25,
+        "maxTitleLength": 35,
         "marqueeEnabled": False,
         "marqueeSpeed": 6,
         "showIcon": True,

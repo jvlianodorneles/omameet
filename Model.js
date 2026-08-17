@@ -126,7 +126,7 @@ function truncate(text, maxLen) {
   if (!text) return "";
   var str = String(text).trim();
   var limit = parseInt(maxLen, 10);
-  if (isNaN(limit) || limit <= 0) return str;
+  if (isNaN(limit) || limit <= 0) limit = 35;
   if (str.length <= limit) return str;
   if (limit <= 1) return "…";
   return str.substring(0, limit - 1) + "…";
@@ -163,7 +163,7 @@ function formatCountdown(minutesToStart, minutesRemaining, status) {
  */
 function formatBarContent(meeting, format, maxTitleLength, marqueeEnabled, showIcon, showCountdown) {
   var maxLen = parseInt(maxTitleLength, 10);
-  if (isNaN(maxLen) || maxLen <= 0) maxLen = 25;
+  if (isNaN(maxLen) || maxLen <= 0) maxLen = 35;
 
   if (!meeting) {
     var emptyText = "No meetings";

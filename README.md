@@ -125,7 +125,7 @@ In `~/.config/omarchy/shell.json` (or via Omarchy settings panel):
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
 | `format` | `enum` | `"icon_title_countdown"` | Text display format (`icon_title_countdown`, `icon_countdown`, `icon_time`, `title_only`, `icon_only`) |
-| `maxTitleLength` | `int` | `25` | Maximum title character limit on the status bar |
+| `maxTitleLength` | `int` | `35` | Maximum title character limit on the status bar |
 | `marqueeEnabled` | `bool` | `false` | Enable smooth marquee scrolling when title exceeds character limit |
 | `marqueeSpeed` | `int` | `6` | Marquee animation cycle duration in seconds |
 | `showIcon` | `bool` | `true` | Show platform / calendar icon |
