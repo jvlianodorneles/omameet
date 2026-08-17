@@ -113,5 +113,32 @@ class TestICalParsing(unittest.TestCase):
         instances = omameet.expand_recurring_events(event, window_start, window_end, tz)
         self.assertGreaterEqual(len(instances), 3)
 
+    def test_declined_and_cancelled_detection(self):
+        ics_text = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:test_declined@omameet
+SUMMARY:Declined Meeting
+DTSTART:20260816T140000Z
+DTEND:20260816T150000Z
+STATUS:CONFIRMED
+ATTENDEE;PARTSTAT=DECLINED:mailto:user@example.com
+END:VEVENT
+BEGIN:VEVENT
+UID:test_cancelled@omameet
+SUMMARY:Cancelled Event
+DTSTART:20260816T160000Z
+DTEND:20260816T170000Z
+STATUS:CANCELLED
+END:VEVENT
+END:VCALENDAR"""
+        tz = omameet.get_local_tz()
+        w_start = datetime.datetime(2026, 8, 16, 0, 0, tzinfo=datetime.timezone.utc).astimezone(tz)
+        w_end = datetime.datetime(2026, 8, 17, 0, 0, tzinfo=datetime.timezone.utc).astimezone(tz)
+        evts = omameet.parse_ics_content(ics_text, {"id": "test", "name": "Test"}, w_start, w_end, tz)
+        self.assertEqual(len(evts), 2)
+        self.assertTrue(evts[0]["is_declined"])
+        self.assertTrue(evts[1]["is_declined"])
+
 if __name__ == "__main__":
     unittest.main()

@@ -15,19 +15,26 @@ import urllib.error
 import ssl
 import subprocess
 import datetime
+import shutil
 from zoneinfo import ZoneInfo
 from typing import Dict, List, Any, Optional, Tuple
 
 STATE_DIR = os.path.expanduser("~/.local/state/omarchy/omameet")
 CONFIG_PATH = os.path.join(STATE_DIR, "config.json")
 STATE_PATH = os.path.join(STATE_DIR, "state.json")
+HOOK_DIR = os.path.expanduser("~/.config/omarchy/hooks")
+HOOK_JOIN_SCRIPT = os.path.join(HOOK_DIR, "omameet-join.sh")
 
 # Default configurations
 DEFAULT_CONFIG = {
     "version": 1,
     "feeds": [],
+    "bookmarks": [
+        {"id": "bm_team", "name": "Team room", "url": "https://meet.jit.si/omarchy-team-room"},
+        {"id": "bm_quick", "name": "Quick Meet", "url": "https://meet.google.com/new"}
+    ],
     "settings": {
-        "format": "icon_title_countdown",
+        "format": "title_countdown",
         "maxTitleLength": 25,
         "marqueeEnabled": False,
         "marqueeSpeed": 6,
@@ -39,7 +46,12 @@ DEFAULT_CONFIG = {
         "notificationLeadMin": 5,
         "hideAllDayEvents": False,
         "hideWithoutLinks": False,
-        "preferredBrowser": ""
+        "hideDeclined": True,
+        "hideTentative": False,
+        "hidePending": False,
+        "pauseMusicOnJoin": True,
+        "preferredBrowser": "",
+        "openInNativeApp": False
     }
 }
 
@@ -128,6 +140,8 @@ def load_config() -> Dict[str, Any]:
                         cfg["settings"][k] = v
             if "feeds" not in cfg:
                 cfg["feeds"] = []
+            if "bookmarks" not in cfg:
+                cfg["bookmarks"] = DEFAULT_CONFIG["bookmarks"]
             return cfg
     except Exception as e:
         print(f"[omameet] Error reading config: {e}", file=sys.stderr)
@@ -142,13 +156,13 @@ def save_config(cfg: Dict[str, Any]):
 
 def load_state() -> Dict[str, Any]:
     if not os.path.exists(STATE_PATH):
-        return {"version": 1, "nextMeeting": None, "todayEvents": [], "tomorrowEvents": [], "lastSyncedAt": 0, "feedsCount": 0}
+        return {"version": 1, "nextMeeting": None, "todayEvents": [], "tomorrowEvents": [], "lastSyncedAt": 0, "feedsCount": 0, "bookmarks": []}
     try:
         with open(STATE_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
         print(f"[omameet] Error reading state: {e}", file=sys.stderr)
-        return {"version": 1, "nextMeeting": None, "todayEvents": [], "tomorrowEvents": [], "lastSyncedAt": 0, "feedsCount": 0}
+        return {"version": 1, "nextMeeting": None, "todayEvents": [], "tomorrowEvents": [], "lastSyncedAt": 0, "feedsCount": 0, "bookmarks": []}
 
 def save_state(state: Dict[str, Any]):
     ensure_dirs()
@@ -156,6 +170,59 @@ def save_state(state: Dict[str, Any]):
     with open(temp_path, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2, ensure_ascii=False)
     os.replace(temp_path, STATE_PATH)
+
+# --- Media & System Integration ---
+
+def pause_media_players():
+    """Pauses any active MPRIS media player via DBus."""
+    try:
+        res = subprocess.run(
+            ['dbus-send', '--session', '--dest=org.freedesktop.DBus', '--type=method_call', '--print-reply', '/org/freedesktop/DBus', 'org.freedesktop.DBus.ListNames'],
+            capture_output=True, text=True, timeout=2
+        )
+        for line in res.stdout.splitlines():
+            if 'org.mpris.MediaPlayer2.' in line and '\"' in line:
+                service = line.split('\"')[1]
+                subprocess.Popen(
+                    ['dbus-send', '--session', f'--dest={service}', '--type=method_call', '/org/mpris/MediaPlayer2', 'org.mpris.MediaPlayer2.Player.Pause'],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
+    except Exception:
+        pass
+
+def run_join_hooks(url: str, provider_id: str, summary: str):
+    """Executes user-defined meeting-join hooks if present."""
+    if os.path.isfile(HOOK_JOIN_SCRIPT) and os.access(HOOK_JOIN_SCRIPT, os.X_OK):
+        try:
+            subprocess.Popen([HOOK_JOIN_SCRIPT, url, provider_id, summary], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
+def launch_url(url: str, provider_id: str = "web", summary: str = "Meeting"):
+    """Opens meeting URL according to preferred browser, native app, and triggers automations."""
+    config = load_config()
+    settings = config.get("settings", {})
+
+    if settings.get("pauseMusicOnJoin", True):
+        pause_media_players()
+
+    run_join_hooks(url, provider_id, summary)
+
+    # Check for native app preferences (e.g. Zoom or Teams native apps)
+    if settings.get("openInNativeApp", False):
+        if provider_id == "zoom" and shutil.which("zoom"):
+            # Native Zoom app format: zoommtg://zoom.us/join?confno=...
+            m = re.search(r"zoom\.us/j/([0-9]+)", url)
+            if m:
+                zoom_uri = f"zoommtg://zoom.us/join?confno={m.group(1)}"
+                subprocess.Popen(["zoom", zoom_uri], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                return
+
+    preferred_browser = settings.get("preferredBrowser", "").strip()
+    if preferred_browser and shutil.which(preferred_browser):
+        subprocess.Popen([preferred_browser, url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        subprocess.Popen(["xdg-open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 # --- Meeting Link Extraction ---
 def extract_meeting_info(location: str, description: str, url_field: str) -> Tuple[Optional[str], Optional[str], Optional[str]]:
@@ -372,12 +439,14 @@ def parse_ics_content(ics_text: str, feed_meta: Dict[str, Any], window_start: da
     in_event = False
     cur_props: Dict[str, Any] = {}
     exdates = []
+    attendee_partstats = []
 
     for line in lines:
         if line.startswith("BEGIN:VEVENT"):
             in_event = True
             cur_props = {"exdates": []}
             exdates = []
+            attendee_partstats = []
             continue
         if line.startswith("END:VEVENT"):
             in_event = False
@@ -399,8 +468,10 @@ def parse_ics_content(ics_text: str, feed_meta: Dict[str, Any], window_start: da
                 url_field = cur_props.get("URL", ("", {}))[0]
                 status = cur_props.get("STATUS", ("CONFIRMED", {}))[0].upper()
 
-                if status == "CANCELLED":
-                    continue
+                # Check if marked as cancelled or declined
+                is_declined = ("DECLINED" in attendee_partstats) or (status == "CANCELLED")
+                is_tentative = ("TENTATIVE" in attendee_partstats) or (status == "TENTATIVE")
+                is_pending = "NEEDS-ACTION" in attendee_partstats
 
                 organizer = unescape_ical_text(cur_props.get("ORGANIZER", ("", {}))[0])
                 uid = cur_props.get("UID", (f"evt_{len(events)}", {}))[0]
@@ -427,7 +498,11 @@ def parse_ics_content(ics_text: str, feed_meta: Dict[str, Any], window_start: da
                     "feed_color": feed_meta.get("color", "#4285F4"),
                     "organizer": organizer,
                     "rrule": rrule,
-                    "exdates": exdates
+                    "exdates": exdates,
+                    "is_declined": is_declined,
+                    "is_tentative": is_tentative,
+                    "is_pending": is_pending,
+                    "status_code": status
                 }
 
                 if rrule:
@@ -447,13 +522,17 @@ def parse_ics_content(ics_text: str, feed_meta: Dict[str, Any], window_start: da
                 for p in parts[1:]:
                     if "=" in p:
                         pk, pv = p.split("=", 1)
-                        params[pk.upper()] = pv
+                        params[pk.upper()] = pv.strip('"')
             else:
                 prop_name = prop_header.upper()
 
             if prop_name == "EXDATE":
                 ex_dt, _ = parse_ical_datetime(prop_value, params, local_tz)
                 exdates.append(ex_dt)
+            elif prop_name == "ATTENDEE":
+                if "PARTSTAT" in params:
+                    attendee_partstats.append(params["PARTSTAT"].upper())
+                cur_props[prop_name] = (prop_value, params)
             else:
                 cur_props[prop_name] = (prop_value, params)
 
@@ -519,6 +598,7 @@ def fetch_feed_content(feed: Dict[str, Any]) -> str:
 def run_sync() -> Dict[str, Any]:
     config = load_config()
     feeds = config.get("feeds", [])
+    bookmarks = config.get("bookmarks", [])
     settings = config.get("settings", {})
 
     local_tz = get_local_tz()
@@ -546,12 +626,21 @@ def run_sync() -> Dict[str, Any]:
 
     hide_all_day = settings.get("hideAllDayEvents", False)
     hide_without_links = settings.get("hideWithoutLinks", False)
+    hide_declined = settings.get("hideDeclined", True)
+    hide_tentative = settings.get("hideTentative", False)
+    hide_pending = settings.get("hidePending", False)
 
     filtered_events = []
     for evt in all_events:
         if hide_all_day and evt["is_all_day"]:
             continue
         if hide_without_links and not evt["has_link"]:
+            continue
+        if hide_declined and evt.get("is_declined", False):
+            continue
+        if hide_tentative and evt.get("is_tentative", False):
+            continue
+        if hide_pending and evt.get("is_pending", False):
             continue
         filtered_events.append(evt)
 
@@ -635,6 +724,7 @@ def run_sync() -> Dict[str, Any]:
         "nextMeeting": next_meeting,
         "todayEvents": today_events,
         "tomorrowEvents": tomorrow_events,
+        "bookmarks": bookmarks,
         "lastSyncedAt": int(now.timestamp() * 1000),
         "feedsCount": len([f for f in feeds if f.get("enabled", True)]),
         "errors": feed_errors
@@ -651,15 +741,19 @@ def action_join_next():
 
     if next_m and next_m.get("videoUrl"):
         url = next_m["videoUrl"]
-        print(f"[omameet] Joining meeting: {next_m.get('summary')} ({url})")
-        subprocess.Popen(["xdg-open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        prov = next_m.get("providerId", "web")
+        summary = next_m.get("summary", "Meeting")
+        print(f"[omameet] Joining meeting: {summary} ({url})")
+        launch_url(url, prov, summary)
         return True
 
     for evt in state.get("todayEvents", []):
         if evt.get("status") in ("ongoing", "soon", "upcoming") and evt.get("videoUrl"):
             url = evt["videoUrl"]
-            print(f"[omameet] Joining meeting: {evt.get('summary')} ({url})")
-            subprocess.Popen(["xdg-open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            prov = evt.get("providerId", "web")
+            summary = evt.get("summary", "Meeting")
+            print(f"[omameet] Joining meeting: {summary} ({url})")
+            launch_url(url, prov, summary)
             return True
 
     print("[omameet] No meeting with a video link found right now.")
@@ -674,7 +768,7 @@ def action_create_instant(provider: str = "google"):
     }
     url = urls.get(provider.lower(), urls["google"])
     print(f"[omameet] Creating instant meeting ({provider}): {url}")
-    subprocess.Popen(["xdg-open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    launch_url(url, provider, f"Instant {provider.capitalize()} Meeting")
 
 def action_notify_check():
     config = load_config()
@@ -712,6 +806,7 @@ def action_list():
     today = state.get("todayEvents", [])
     tomorrow = state.get("tomorrowEvents", [])
     next_m = state.get("nextMeeting")
+    bookmarks = state.get("bookmarks", [])
 
     print("\n\033[1;36m━━━ 📅 OMAMEET AGENDA ━━━\033[0m\n")
 
@@ -738,6 +833,11 @@ def action_list():
         link_badge = f"\033[34m[{e.get('providerName')}]\033[0m" if e.get("hasLink") else ""
         time_str = "All Day" if e.get("isAllDay") else f"{e.get('start')} - {e.get('end')}"
         print(f"  • \033[1m{time_str}\033[0m: {e.get('summary')} {link_badge}")
+
+    if bookmarks:
+        print(f"\n\033[1m🔖 Bookmarks & Quick Rooms ({len(bookmarks)}):\033[0m")
+        for b in bookmarks:
+            print(f"  • \033[1m{b.get('name')}\033[0m: {b.get('url')}")
     print()
 
 def main():
@@ -753,6 +853,13 @@ def main():
 
     elif cmd in ("join", "j", "join-next"):
         action_join_next()
+
+    elif cmd in ("launch", "open"):
+        if len(sys.argv) > 2:
+            url = sys.argv[2]
+            launch_url(url)
+        else:
+            action_join_next()
 
     elif cmd in ("next", "n"):
         state = run_sync()
@@ -822,6 +929,43 @@ def main():
                 print(f"  • [{f.get('id')}] \033[1m{f.get('name')}\033[0m: {f.get('url')} ({status})")
             print()
 
+    elif cmd in ("add-bookmark", "bookmark"):
+        if len(sys.argv) < 4:
+            print("Usage: omameet add-bookmark <name> <url>", file=sys.stderr)
+            sys.exit(1)
+        name = sys.argv[2]
+        url = sys.argv[3]
+        cfg = load_config()
+        if "bookmarks" not in cfg:
+            cfg["bookmarks"] = []
+        bm_id = f"bm_{int(datetime.datetime.now().timestamp())}"
+        cfg["bookmarks"].append({"id": bm_id, "name": name, "url": url})
+        save_config(cfg)
+        print(f"[omameet] Bookmark '{name}' added!")
+        run_sync()
+
+    elif cmd in ("remove-bookmark", "rm-bm"):
+        if len(sys.argv) < 3:
+            print("Usage: omameet remove-bookmark <id_or_name>", file=sys.stderr)
+            sys.exit(1)
+        target = sys.argv[2]
+        cfg = load_config()
+        cfg["bookmarks"] = [b for b in cfg.get("bookmarks", []) if b.get("id") != target and b.get("name") != target]
+        save_config(cfg)
+        print(f"[omameet] Bookmark '{target}' removed.")
+        run_sync()
+
+    elif cmd in ("list-bookmarks", "bookmarks"):
+        cfg = load_config()
+        bms = cfg.get("bookmarks", [])
+        if "--json" in sys.argv:
+            print(json.dumps(bms, indent=2, ensure_ascii=False))
+        else:
+            print(f"\n\033[1mSaved Bookmarks ({len(bms)}):\033[0m")
+            for b in bms:
+                print(f"  • [{b.get('id')}] \033[1m{b.get('name')}\033[0m: {b.get('url')}")
+            print()
+
     elif cmd in ("help", "h"):
         print("""
 omameet - Universal MeetingBar for Omarchy Quattro
@@ -832,12 +976,16 @@ Usage:
 Commands:
   sync, refresh              Sync all calendar feeds and update state
   join, join-next            Immediately join the current or next meeting in default browser
+  launch <url>               Open a meeting URL with media pause and automation hooks
   next [--json]              Display next meeting information
-  list, agenda [--json]      List today's and tomorrow's agenda
+  list, agenda [--json]      List today's and tomorrow's agenda and bookmarks
   create [google|zoom|jitsi] Open instant meeting room
   add-feed <name> <url>      Add a new calendar feed (iCal, webcal:// or local path)
   remove-feed <id>           Remove a configured calendar
   list-feeds [--json]        List all configured calendars
+  add-bookmark <name> <url>  Bookmark a recurring room or video link
+  remove-bookmark <id>       Remove a bookmarked room
+  list-bookmarks [--json]    List all saved bookmarks
   notify-check               Check upcoming meetings and trigger desktop reminder
 """)
 

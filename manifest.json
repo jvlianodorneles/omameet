@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "id": "dorneles.omameet",
   "name": "omameet",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "author": "Dorneles",
   "license": "MIT",
-  "description": "Universal MeetingBar for Omarchy: Shows upcoming meetings with countdown, 1-click join (Meet, Zoom, Teams), interactive agenda popup, and desktop alerts.",
+  "description": "Universal MeetingBar for Omarchy: Shows upcoming meetings with countdown, 1-click join (Meet, Zoom, Teams), interactive agenda popup, bookmarks, music pause on join, and desktop alerts.",
   "kinds": [
     "bar-widget"
   ],
@@ -14,7 +14,7 @@
   },
   "barWidget": {
     "displayName": "omameet",
-    "description": "Next meeting countdown, 1-click video call join, and calendar agenda popup",
+    "description": "Next meeting countdown, 1-click video call join, bookmarks, and calendar agenda popup",
     "category": "Time",
     "allowMultiple": false,
     "defaultSection": "right",
@@ -30,7 +30,13 @@
       "enableNotifications": true,
       "notificationLeadMin": 5,
       "hideAllDayEvents": false,
-      "hideWithoutLinks": false
+      "hideWithoutLinks": false,
+      "hideDeclined": true,
+      "hideTentative": false,
+      "hidePending": false,
+      "pauseMusicOnJoin": true,
+      "preferredBrowser": "",
+      "openInNativeApp": false
     },
     "schema": [
       {
@@ -90,6 +96,48 @@
         "description": "Show relative time countdown (e.g. 'in 15 min' or '20 min left')."
       },
       {
+        "key": "pauseMusicOnJoin",
+        "type": "boolean",
+        "label": "Pause Music When Joining",
+        "defaultValue": true,
+        "description": "Automatically pause active MPRIS media players (Spotify, browser, etc.) when joining a meeting."
+      },
+      {
+        "key": "hideDeclined",
+        "type": "boolean",
+        "label": "Hide Declined Meetings",
+        "defaultValue": true,
+        "description": "Filter out meetings that you have declined or marked as cancelled."
+      },
+      {
+        "key": "hideTentative",
+        "type": "boolean",
+        "label": "Hide Tentative Meetings",
+        "defaultValue": false,
+        "description": "Filter out tentative or unconfirmed meetings."
+      },
+      {
+        "key": "hidePending",
+        "type": "boolean",
+        "label": "Hide Pending Invites",
+        "defaultValue": false,
+        "description": "Filter out meeting invites requiring response (needs action)."
+      },
+      {
+        "key": "hideAllDayEvents",
+        "type": "boolean",
+        "label": "Hide All-Day Events",
+        "defaultValue": false,
+        "description": "Do not show all-day calendar events on the status bar or next meeting."
+      },
+      {
+        "key": "hideWithoutLinks",
+        "type": "boolean",
+        "label": "Only Show Events with Video Links",
+        "defaultValue": false,
+        "description": "Filter out calendar events that do not contain a video meeting link."
+      },
+      {
         "key": "refreshIntervalMin",
         "type": "integer",
         "label": "Auto-Refresh Interval (minutes)",
@@ -127,18 +175,18 @@
         "description": "How many minutes before the meeting to send the desktop reminder."
       },
       {
-        "key": "hideAllDayEvents",
-        "type": "boolean",
-        "label": "Hide All-Day Events",
-        "defaultValue": false,
-        "description": "Do not show all-day calendar events on the status bar or next meeting."
+        "key": "preferredBrowser",
+        "type": "string",
+        "label": "Preferred Browser / App",
+        "defaultValue": "",
+        "description": "Custom browser executable to open meeting links (e.g. google-chrome-stable, firefox, brave). Leave empty for default."
       },
       {
-        "key": "hideWithoutLinks",
+        "key": "openInNativeApp",
         "type": "boolean",
-        "label": "Only Show Events with Video Links",
+        "label": "Open in Native App (Zoom/Teams)",
         "defaultValue": false,
-        "description": "Filter out calendar events that do not contain a video meeting link."
+        "description": "Launch native client application for Zoom/Teams instead of web browser if installed."
       }
     ]
   }
