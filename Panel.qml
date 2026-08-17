@@ -388,24 +388,24 @@ Panel {
           }
         }
 
-        // 2. Instant Meeting Service Selector (Borderless)
-        Item {
+        // 2. Instant Meeting Service Selector (2-row layout, zero overlap)
+        Column {
           width: parent.width
-          height: Style.space(28)
+          spacing: Style.space(4)
+
+          Text {
+            text: "Instant Meeting App"
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body * 0.95
+          }
 
           RowLayout {
-            anchors.fill: parent
+            width: parent.width
             spacing: Style.space(4)
 
-            Text {
-              Layout.fillWidth: true
-              text: "Instant Meeting App"
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body * 0.95
-            }
-
             Button {
+              Layout.fillWidth: true
               implicitHeight: Style.space(24)
               text: "Meet"
               iconText: "󰄚"
@@ -416,6 +416,7 @@ Panel {
             }
 
             Button {
+              Layout.fillWidth: true
               implicitHeight: Style.space(24)
               text: "Zoom"
               iconText: "󰍡"
@@ -426,6 +427,7 @@ Panel {
             }
 
             Button {
+              Layout.fillWidth: true
               implicitHeight: Style.space(24)
               text: "Jitsi"
               iconText: "󰍫"
@@ -436,6 +438,7 @@ Panel {
             }
 
             Button {
+              Layout.fillWidth: true
               implicitHeight: Style.space(24)
               text: "Teams"
               iconText: "󰊻"
