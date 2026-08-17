@@ -120,21 +120,16 @@ function getProviderMeta(providerId) {
 }
 
 /**
- * Truncates text with ellipsis if it exceeds maxLen.
+ * Truncates text with ellipsis so that result.length <= maxLen.
  */
 function truncate(text, maxLen) {
   if (!text) return "";
   var str = String(text).trim();
-  if (maxLen <= 0 || str.length <= maxLen) return str;
-  return str.substring(0, Math.max(1, maxLen - 1)) + "…";
-}
-
-/**
- * Checks if marquee is needed for this text.
- */
-function isMarqueeNeeded(text, maxLen) {
-  if (!text) return false;
-  return String(text).length > maxLen;
+  var limit = parseInt(maxLen, 10);
+  if (isNaN(limit) || limit <= 0) return str;
+  if (str.length <= limit) return str;
+  if (limit <= 1) return "…";
+  return str.substring(0, limit - 1) + "…";
 }
 
 /**
@@ -164,16 +159,21 @@ function formatCountdown(minutesToStart, minutesRemaining, status) {
 
 /**
  * Formats the bar widget text based on format and settings.
+ * Strictly guarantees that non-marquee text will NEVER exceed maxTitleLength characters.
  */
 function formatBarContent(meeting, format, maxTitleLength, marqueeEnabled, showIcon, showCountdown) {
+  var maxLen = parseInt(maxTitleLength, 10);
+  if (isNaN(maxLen) || maxLen <= 0) maxLen = 25;
+
   if (!meeting) {
+    var emptyText = "No meetings";
     return {
       icon: showIcon ? "󰃭" : "",
-      title: "No meetings",
-      rawTitle: "No meetings",
+      title: emptyText,
+      rawTitle: emptyText,
       time: "",
       countdown: "",
-      fullText: showIcon ? "󰃭 No meetings" : "No meetings",
+      fullText: showIcon ? "󰃭 " + emptyText : emptyText,
       isLive: false,
       isSoon: false,
       hasLink: false,
@@ -183,52 +183,80 @@ function formatBarContent(meeting, format, maxTitleLength, marqueeEnabled, showI
 
   var meta = getProviderMeta(meeting.providerId);
   var icon = showIcon ? meta.icon : "";
-  var rawTitle = meeting.summary || "Meeting";
-  var title = marqueeEnabled ? rawTitle : truncate(rawTitle, maxTitleLength);
+  var rawTitle = (meeting.summary || "Meeting").trim();
   var timeStr = meeting.isAllDay ? "All Day" : (meeting.start || "");
   var countdownStr = showCountdown ? formatCountdown(meeting.minutesToStart, meeting.minutesRemaining, meeting.status) : "";
   var isLive = meeting.status === "ongoing";
   var isSoon = meeting.status === "soon";
   var hasLink = !!meeting.videoUrl;
-  var needsMarquee = marqueeEnabled && isMarqueeNeeded(rawTitle, maxTitleLength);
 
-  var fullText = "";
+  var livePrefix = isLive ? "🔴 " : (icon ? icon + " " : "");
+  var timeSuffix = "";
+  if (isLive) {
+    timeSuffix = countdownStr ? (" (" + countdownStr + ")") : "";
+  } else {
+    timeSuffix = countdownStr ? (" " + countdownStr) : (timeStr ? (" " + timeStr) : "");
+  }
+
+  var rawFullText = "";
   switch (format) {
     case "icon_only":
-      fullText = icon !== "" ? icon : "󰃭";
+      rawFullText = icon !== "" ? icon : "󰃭";
       break;
 
     case "title_only":
-      fullText = title;
+      rawFullText = rawTitle;
       break;
 
     case "countdown_only":
     case "icon_countdown":
-      fullText = (icon ? icon + " " : "") + (isLive ? "🔴 " : "") + (countdownStr ? countdownStr : timeStr);
+      rawFullText = (icon ? icon + " " : "") + (isLive ? "🔴 " : "") + (countdownStr ? countdownStr : timeStr);
       break;
 
     case "icon_time":
-      fullText = (icon ? icon + " " : "") + (isLive ? "🔴 " : "") + timeStr + " " + title;
+      rawFullText = (icon ? icon + " " : "") + (isLive ? "🔴 " : "") + timeStr + " " + rawTitle;
       break;
 
     case "icon_title_countdown":
-      var livePrefix = isLive ? "🔴 " : (icon ? icon + " " : "");
-      var timeSuffix = isLive ? (" (" + countdownStr + ")") : (countdownStr ? (" " + countdownStr) : "");
-      fullText = livePrefix + title + timeSuffix;
+      rawFullText = livePrefix + rawTitle + timeSuffix;
       break;
 
     case "title_countdown":
     default:
-      var livePrefix = isLive ? "🔴 " : "";
-      var timeSuffix = isLive ? (" (" + countdownStr + ")") : (countdownStr ? (" " + countdownStr) : "");
-      fullText = livePrefix + title + timeSuffix;
+      var pfx = isLive ? "🔴 " : "";
+      rawFullText = pfx + rawTitle + timeSuffix;
       break;
+  }
+
+  rawFullText = rawFullText.trim();
+  var needsMarquee = marqueeEnabled && (rawFullText.length > maxLen || rawTitle.length > maxLen);
+
+  var fullText = "";
+  if (needsMarquee) {
+    // When marquee is enabled, keep full text for smooth scrolling
+    fullText = rawFullText;
+  } else {
+    // Strictly cap text at maxLen characters
+    if (rawFullText.length <= maxLen) {
+      fullText = rawFullText;
+    } else {
+      var pfxStr = format === "title_countdown" ? (isLive ? "🔴 " : "") : livePrefix;
+      var availTitle = maxLen - pfxStr.length - timeSuffix.length;
+
+      if (availTitle >= 4) {
+        var truncTitle = truncate(rawTitle, availTitle);
+        fullText = pfxStr + truncTitle + timeSuffix;
+      } else {
+        fullText = truncate(rawFullText, maxLen);
+      }
+    }
   }
 
   return {
     icon: icon,
-    title: title,
+    title: rawTitle,
     rawTitle: rawTitle,
+    rawFullText: rawFullText,
     time: timeStr,
     countdown: countdownStr,
     fullText: fullText.trim(),
