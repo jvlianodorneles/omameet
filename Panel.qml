@@ -132,7 +132,7 @@ Panel {
           root.pauseMusicState = parsed.settings.pauseMusicOnJoin !== false
           root.hideDeclinedState = parsed.settings.hideDeclined !== false
           if (parsed.settings.maxTitleLength !== undefined) {
-            root.maxTitleLengthState = parsed.settings.maxTitleLength
+            root.maxTitleLengthState = Number(parsed.settings.maxTitleLength) || 25
           }
         }
       } catch (e) {}
@@ -299,7 +299,7 @@ Panel {
           }
         }
 
-        // 1. Max Title Length Stepper
+        // 1. Max Title Length Stepper - Always shows 3 fixed buttons
         Item {
           width: parent.width
           height: Style.space(28)
@@ -316,29 +316,37 @@ Panel {
               font.pixelSize: Style.font.body * 0.95
             }
 
+            // Decrease Button [-]
             Button {
               implicitWidth: Style.space(24)
               implicitHeight: Style.space(24)
               text: "-"
-              tooltipText: "Decrease length"
-              onClicked: root.changeMaxTitleLength(-5)
+              enabled: root.maxTitleLengthState > 5
+              opacity: enabled ? 1.0 : 0.35
+              tooltipText: enabled ? "Decrease length" : ""
+              onClicked: if (enabled) root.changeMaxTitleLength(-5)
             }
 
+            // Increase Button [+]
             Button {
               implicitWidth: Style.space(24)
               implicitHeight: Style.space(24)
               text: "+"
-              tooltipText: "Increase length"
-              onClicked: root.changeMaxTitleLength(5)
+              enabled: root.maxTitleLengthState < 80
+              opacity: enabled ? 1.0 : 0.35
+              tooltipText: enabled ? "Increase length" : ""
+              onClicked: if (enabled) root.changeMaxTitleLength(5)
             }
 
+            // Reset Button [↺] - ALWAYS VISIBLE, disabled when already 25
             Button {
-              visible: root.maxTitleLengthState !== 25
               implicitWidth: Style.space(24)
               implicitHeight: Style.space(24)
               iconText: "↺"
-              tooltipText: "Reset default (25 chars)"
-              onClicked: root.resetMaxTitleLength()
+              enabled: root.maxTitleLengthState !== 25
+              opacity: enabled ? 1.0 : 0.35
+              tooltipText: enabled ? "Reset to default (25 chars)" : ""
+              onClicked: if (enabled) root.resetMaxTitleLength()
             }
           }
         }
