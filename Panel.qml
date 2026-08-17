@@ -46,6 +46,7 @@ Panel {
   property bool muteMicState: false
   property bool hideDeclinedState: true
   property string instantMeetingProviderState: "google"
+  property string currentSectionState: "left"
 
   readonly property var instantProviderMeta: {
     switch (root.instantMeetingProviderState) {
@@ -151,6 +152,13 @@ Panel {
     updateWidgetSetting("defaultInstantMeetingProvider", prov)
   }
 
+  function setBarSection(sec) {
+    root.currentSectionState = sec
+    if (syncScriptPath !== "") {
+      Quickshell.execDetached(["python3", syncScriptPath, "set-section", sec])
+    }
+  }
+
   function loadConfigData() {
     Quickshell.execDetached(["python3", "-c", "import json, os; print(open(os.path.expanduser('~/.local/state/omarchy/omameet/config.json')).read())"], function(output) {
       try {
@@ -169,6 +177,15 @@ Panel {
         }
       } catch (e) {}
     })
+
+    if (syncScriptPath !== "") {
+      Quickshell.execDetached(["python3", syncScriptPath, "get-section"], function(secOut) {
+        var sec = (secOut || "").trim().toLowerCase()
+        if (sec === "left" || sec === "center" || sec === "right") {
+          root.currentSectionState = sec
+        }
+      })
+    }
   }
 
   function addFeed() {
@@ -328,7 +345,7 @@ Panel {
           height: Style.space(16)
           Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: "STATUS BAR & AUTOMATIONS"
+            text: "STATUS BAR & POSITION"
             color: Color.muted
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption * 0.85
@@ -388,7 +405,58 @@ Panel {
           }
         }
 
-        // 2. Instant Meeting Service Selector (2-row layout, zero overlap)
+        // 2. Bar Position Selector (Left, Center, Right)
+        Column {
+          width: parent.width
+          spacing: Style.space(4)
+
+          Text {
+            text: "Bar Position"
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body * 0.95
+          }
+
+          RowLayout {
+            width: parent.width
+            spacing: Style.space(4)
+
+            Button {
+              Layout.fillWidth: true
+              implicitHeight: Style.space(24)
+              text: "Left (Default)"
+              iconText: "󰁍"
+              selected: root.currentSectionState === "left"
+              accent: Color.accent
+              tooltipText: "Position plugin on the left side of the top bar"
+              onClicked: root.setBarSection("left")
+            }
+
+            Button {
+              Layout.fillWidth: true
+              implicitHeight: Style.space(24)
+              text: "Center"
+              iconText: "󰁌"
+              selected: root.currentSectionState === "center"
+              accent: Color.accent
+              tooltipText: "Position plugin in the center of the top bar"
+              onClicked: root.setBarSection("center")
+            }
+
+            Button {
+              Layout.fillWidth: true
+              implicitHeight: Style.space(24)
+              text: "Right"
+              iconText: "󰁔"
+              selected: root.currentSectionState === "right"
+              accent: Color.accent
+              tooltipText: "Position plugin on the right side of the top bar"
+              onClicked: root.setBarSection("right")
+            }
+          }
+        }
+
+        // 3. Instant Meeting Service Selector (2-row layout, zero overlap)
         Column {
           width: parent.width
           spacing: Style.space(4)
@@ -450,7 +518,7 @@ Panel {
           }
         }
 
-        // 3. Marquee Switch (Borderless)
+        // 4. Marquee Switch (Borderless)
         Item {
           width: parent.width
           height: Style.space(28)
@@ -480,7 +548,7 @@ Panel {
           }
         }
 
-        // 4. Pause Music Switch (Borderless)
+        // 5. Pause Music Switch (Borderless)
         Item {
           width: parent.width
           height: Style.space(28)
@@ -510,7 +578,7 @@ Panel {
           }
         }
 
-        // 5. Mute Microphone Switch (Borderless)
+        // 6. Mute Microphone Switch (Borderless)
         Item {
           width: parent.width
           height: Style.space(28)
@@ -540,7 +608,7 @@ Panel {
           }
         }
 
-        // 6. Desktop Reminders Switch (Borderless)
+        // 7. Desktop Reminders Switch (Borderless)
         Item {
           width: parent.width
           height: Style.space(28)
@@ -570,7 +638,7 @@ Panel {
           }
         }
 
-        // 7. Hide Declined Switch (Borderless)
+        // 8. Hide Declined Switch (Borderless)
         Item {
           width: parent.width
           height: Style.space(28)

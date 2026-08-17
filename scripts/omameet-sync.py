@@ -946,8 +946,73 @@ def main():
             action_list()
 
     elif cmd in ("create", "instant"):
-        provider = sys.argv[2] if len(sys.argv) > 2 else "google"
+        provider = sys.argv[2] if len(sys.argv) > 2 else None
         action_create_instant(provider)
+
+    elif cmd in ("get-section", "section"):
+        shell_path = os.path.expanduser("~/.config/omarchy/shell.json")
+        cur_sec = "left"
+        if os.path.exists(shell_path):
+            try:
+                data = json.load(open(shell_path, "r", encoding="utf-8"))
+                bar_obj = data.get("bar", {})
+                container = bar_obj.get("layout", bar_obj)
+                for s in ("left", "center", "right"):
+                    for item in container.get(s, []):
+                        if isinstance(item, dict) and item.get("id") in ("dorneles.omameet", "omameet"):
+                            cur_sec = s
+                            break
+            except Exception:
+                pass
+        print(cur_sec)
+
+    elif cmd in ("set-section", "move-section"):
+        if len(sys.argv) < 3:
+            print("[omameet] Usage: omameet-sync.py set-section <left|center|right>", file=sys.stderr)
+            sys.exit(1)
+        target = sys.argv[2].lower().strip()
+        if target not in ("left", "center", "right"):
+            print("[omameet] Invalid section. Choose: left, center, right", file=sys.stderr)
+            sys.exit(1)
+
+        shell_path = os.path.expanduser("~/.config/omarchy/shell.json")
+        if not os.path.exists(shell_path):
+            print("[omameet] shell.json not found", file=sys.stderr)
+            sys.exit(1)
+
+        try:
+            with open(shell_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+
+            bar_obj = data.get("bar", {})
+            container = bar_obj.get("layout", bar_obj)
+            current_entry = None
+
+            for s in ("left", "center", "right"):
+                if s in container and isinstance(container[s], list):
+                    remaining = []
+                    for item in container[s]:
+                        if isinstance(item, dict) and item.get("id") in ("dorneles.omameet", "omameet"):
+                            current_entry = item
+                        else:
+                            remaining.append(item)
+                    container[s] = remaining
+
+            if not current_entry:
+                current_entry = {"id": "dorneles.omameet"}
+
+            if target not in container or not isinstance(container[target], list):
+                container[target] = []
+            container[target].append(current_entry)
+
+            with open(shell_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+
+            print(f"[omameet] Positioned plugin on the {target} section of the top bar.")
+            subprocess.Popen(["omarchy", "restart", "shell"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception as e:
+            print(f"[omameet] Error updating shell.json: {e}", file=sys.stderr)
+            sys.exit(1)
 
     elif cmd in ("notify-check", "notify"):
         action_notify_check()

@@ -17,7 +17,7 @@
     "description": "Next meeting countdown, 1-click video call join, bookmarks, and calendar agenda popup",
     "category": "Time",
     "allowMultiple": false,
-    "defaultSection": "right",
+    "defaultSection": "left",
     "defaults": {
       "format": "title_countdown",
       "maxTitleLength": 35,
