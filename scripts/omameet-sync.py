@@ -50,6 +50,8 @@ DEFAULT_CONFIG = {
         "hideTentative": False,
         "hidePending": False,
         "pauseMusicOnJoin": True,
+        "muteMicOnJoin": False,
+        "defaultInstantMeetingProvider": "google",
         "preferredBrowser": "",
         "openInNativeApp": False
     }
@@ -797,16 +799,22 @@ def action_join_next():
     print("[omameet] No meeting with a video link found right now.")
     return False
 
-def action_create_instant(provider: str = "google"):
+def action_create_instant(provider: str = None):
+    config = load_config()
+    settings = config.get("settings", {})
+    if not provider:
+        provider = settings.get("defaultInstantMeetingProvider", "google")
+
     urls = {
         "google": "https://meet.google.com/new",
         "zoom": "https://zoom.us/start/videomeeting",
         "jitsi": f"https://meet.jit.si/omameet-{int(datetime.datetime.now().timestamp())}",
         "teams": "https://teams.microsoft.com/l/meetup-join/instant"
     }
-    url = urls.get(provider.lower(), urls["google"])
-    print(f"[omameet] Creating instant meeting ({provider}): {url}")
-    launch_url(url, provider, f"Instant {provider.capitalize()} Meeting")
+    prov_key = str(provider).lower().strip()
+    url = urls.get(prov_key, urls["google"])
+    print(f"[omameet] Creating instant meeting ({prov_key}): {url}")
+    launch_url(url, prov_key, f"Instant {prov_key.capitalize()} Meeting")
 
 def action_notify_check():
     config = load_config()

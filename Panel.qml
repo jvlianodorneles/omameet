@@ -45,6 +45,21 @@ Panel {
   property bool pauseMusicState: true
   property bool muteMicState: false
   property bool hideDeclinedState: true
+  property string instantMeetingProviderState: "google"
+
+  readonly property var instantProviderMeta: {
+    switch (root.instantMeetingProviderState) {
+      case "zoom":
+        return { name: "Zoom", icon: "󰍡", color: "#2D8CFF" }
+      case "jitsi":
+        return { name: "Jitsi", icon: "󰍫", color: "#17A2B8" }
+      case "teams":
+        return { name: "Teams", icon: "󰊻", color: "#6264A7" }
+      case "google":
+      default:
+        return { name: "Meet", icon: "󰄚", color: "#00AC47" }
+    }
+  }
 
   onHostWidgetChanged: {
     if (hostWidget) {
@@ -124,10 +139,16 @@ Panel {
   }
 
   function createInstantMeeting(provider) {
+    var prov = provider || root.instantMeetingProviderState || "google"
     if (syncScriptPath !== "") {
-      Quickshell.execDetached(["python3", syncScriptPath, "create", provider])
+      Quickshell.execDetached(["python3", syncScriptPath, "create", prov])
       close()
     }
+  }
+
+  function setInstantMeetingProvider(prov) {
+    root.instantMeetingProviderState = prov
+    updateWidgetSetting("defaultInstantMeetingProvider", prov)
   }
 
   function loadConfigData() {
@@ -139,6 +160,9 @@ Panel {
           root.pauseMusicState = parsed.settings.pauseMusicOnJoin !== false
           root.muteMicState = parsed.settings.muteMicOnJoin === true
           root.hideDeclinedState = parsed.settings.hideDeclined !== false
+          if (parsed.settings.defaultInstantMeetingProvider) {
+            root.instantMeetingProviderState = parsed.settings.defaultInstantMeetingProvider
+          }
           if (parsed.settings.maxTitleLength !== undefined) {
             root.maxTitleLengthState = Number(parsed.settings.maxTitleLength) || 35
           }
@@ -230,7 +254,7 @@ Panel {
     if (hostWidget && typeof hostWidget.updateSetting === "function") {
       hostWidget.updateSetting(key, value)
     }
-    var valStr = typeof value === "number" ? String(value) : (value ? "True" : "False")
+    var valStr = typeof value === "number" ? String(value) : (typeof value === "string" ? ("\"" + value + "\"") : (value ? "True" : "False"))
     Quickshell.execDetached(["python3", "-c", "import json, os; p = os.path.expanduser('~/.local/state/omarchy/omameet/config.json'); d = json.load(open(p)); d.setdefault('settings', {})['" + key + "'] = " + valStr + "; json.dump(d, open(p, 'w'), indent=2)"])
   }
 
@@ -240,7 +264,7 @@ Panel {
     owner: root.barIdentity
     bar: root.bar
     open: root.opened
-    contentWidth: root.inSettingsView ? Style.space(380) : Style.space(305)
+    contentWidth: root.inSettingsView ? Style.space(385) : Style.space(305)
     contentHeight: root.inSettingsView ? (settingsColumn.implicitHeight + Style.space(24)) : (contentColumn.implicitHeight + Style.space(24))
 
     PanelKeyCatcher {
@@ -304,7 +328,7 @@ Panel {
           height: Style.space(16)
           Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: "STATUS BAR"
+            text: "STATUS BAR & AUTOMATIONS"
             color: Color.muted
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption * 0.85
@@ -364,7 +388,66 @@ Panel {
           }
         }
 
-        // 2. Marquee Switch (Borderless)
+        // 2. Instant Meeting Service Selector (Borderless)
+        Item {
+          width: parent.width
+          height: Style.space(28)
+
+          RowLayout {
+            anchors.fill: parent
+            spacing: Style.space(4)
+
+            Text {
+              Layout.fillWidth: true
+              text: "Instant Meeting App"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body * 0.95
+            }
+
+            Button {
+              implicitHeight: Style.space(24)
+              text: "Meet"
+              iconText: "󰄚"
+              selected: root.instantMeetingProviderState === "google"
+              accent: "#00AC47"
+              tooltipText: "Google Meet"
+              onClicked: root.setInstantMeetingProvider("google")
+            }
+
+            Button {
+              implicitHeight: Style.space(24)
+              text: "Zoom"
+              iconText: "󰍡"
+              selected: root.instantMeetingProviderState === "zoom"
+              accent: "#2D8CFF"
+              tooltipText: "Zoom"
+              onClicked: root.setInstantMeetingProvider("zoom")
+            }
+
+            Button {
+              implicitHeight: Style.space(24)
+              text: "Jitsi"
+              iconText: "󰍫"
+              selected: root.instantMeetingProviderState === "jitsi"
+              accent: "#17A2B8"
+              tooltipText: "Jitsi Meet"
+              onClicked: root.setInstantMeetingProvider("jitsi")
+            }
+
+            Button {
+              implicitHeight: Style.space(24)
+              text: "Teams"
+              iconText: "󰊻"
+              selected: root.instantMeetingProviderState === "teams"
+              accent: "#6264A7"
+              tooltipText: "Microsoft Teams"
+              onClicked: root.setInstantMeetingProvider("teams")
+            }
+          }
+        }
+
+        // 3. Marquee Switch (Borderless)
         Item {
           width: parent.width
           height: Style.space(28)
@@ -394,7 +477,7 @@ Panel {
           }
         }
 
-        // 3. Pause Music Switch (Borderless)
+        // 4. Pause Music Switch (Borderless)
         Item {
           width: parent.width
           height: Style.space(28)
@@ -424,7 +507,7 @@ Panel {
           }
         }
 
-        // 4. Mute Microphone Switch (Borderless)
+        // 5. Mute Microphone Switch (Borderless)
         Item {
           width: parent.width
           height: Style.space(28)
@@ -454,7 +537,7 @@ Panel {
           }
         }
 
-        // 5. Desktop Reminders Switch (Borderless)
+        // 6. Desktop Reminders Switch (Borderless)
         Item {
           width: parent.width
           height: Style.space(28)
@@ -484,7 +567,7 @@ Panel {
           }
         }
 
-        // 6. Hide Declined Switch (Borderless)
+        // 7. Hide Declined Switch (Borderless)
         Item {
           width: parent.width
           height: Style.space(28)
@@ -1179,7 +1262,7 @@ Panel {
           }
         }
 
-        // 5. QUICK ACTION: Create Instant Meeting
+        // 5. QUICK ACTION: Create Instant Meeting (Dynamic Provider)
         Item { width: parent.width; height: Style.space(4) }
         Rectangle {
           width: parent.width
@@ -1200,7 +1283,7 @@ Panel {
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: root.createInstantMeeting("google")
+            onClicked: root.createInstantMeeting(root.instantMeetingProviderState)
           }
 
           RowLayout {
@@ -1217,15 +1300,15 @@ Panel {
 
             Text {
               Layout.fillWidth: true
-              text: "Create instant meeting (Meet)"
+              text: "Create instant meeting (" + root.instantProviderMeta.name + ")"
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.body * 0.92
             }
 
             Text {
-              text: "󰄚"
-              color: "#00AC47"
+              text: root.instantProviderMeta.icon
+              color: root.instantProviderMeta.color
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
             }

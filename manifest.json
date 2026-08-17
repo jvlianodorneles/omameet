@@ -37,6 +37,7 @@
       "hidePending": false,
       "pauseMusicOnJoin": true,
       "muteMicOnJoin": false,
+      "defaultInstantMeetingProvider": "google",
       "preferredBrowser": "",
       "openInNativeApp": false
     },
@@ -120,6 +121,19 @@
         "label": "Mute Microphone When Joining",
         "defaultValue": false,
         "description": "Automatically mute the system microphone capture source when joining a meeting."
+      },
+      {
+        "key": "defaultInstantMeetingProvider",
+        "type": "enum",
+        "label": "Instant Meeting Service",
+        "options": [
+          "google",
+          "zoom",
+          "jitsi",
+          "teams"
+        ],
+        "defaultValue": "google",
+        "description": "Preferred service used when creating an ad-hoc instant meeting (Google Meet, Zoom, Jitsi, Teams)."
       },
       {
         "key": "hideDeclined",
