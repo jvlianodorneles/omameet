@@ -21,7 +21,7 @@ Panel {
 
   readonly property color foreground: Color.popups.text
   readonly property color activeColor: Color.accent
-  readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
+  readonly property string fontFamily: Style.font.family
 
   readonly property var nextMeeting: meetingState ? meetingState.nextMeeting : null
   readonly property var todayEvents: meetingState ? (meetingState.todayEvents || []) : []
@@ -1183,7 +1183,7 @@ Panel {
               text: "omameet"
               color: Color.muted
               font.family: root.fontFamily
-              font.pixelSize: Style.font.caption * 0.88
+              font.pixelSize: Style.font.caption
             }
 
             Button {
