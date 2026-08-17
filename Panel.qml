@@ -48,6 +48,27 @@ Panel {
   property string instantMeetingProviderState: "google"
   property string currentSectionState: "left"
 
+  readonly property string liveBarSection: {
+    var b = root.bar || (hostWidget ? hostWidget.bar : null)
+    if (b && b.layoutConfig) {
+      var secList = ["left", "center", "right"]
+      for (var s = 0; s < secList.length; s++) {
+        var arr = b.layoutConfig[secList[s]] || []
+        for (var i = 0; i < arr.length; i++) {
+          var item = arr[i]
+          var eid = item ? (typeof item === "string" ? item : item.id) : ""
+          if (eid === "dorneles.omameet" || eid === "omameet") {
+            return secList[s]
+          }
+        }
+      }
+    }
+    if (hostWidget && hostWidget.parent && hostWidget.parent.region) {
+      return hostWidget.parent.region
+    }
+    return currentSectionState || "left"
+  }
+
   readonly property var instantProviderMeta: {
     switch (root.instantMeetingProviderState) {
       case "zoom":
@@ -178,14 +199,12 @@ Panel {
       } catch (e) {}
     })
 
-    if (syncScriptPath !== "") {
-      Quickshell.execDetached(["python3", syncScriptPath, "get-section"], function(secOut) {
-        var sec = (secOut || "").trim().toLowerCase()
-        if (sec === "left" || sec === "center" || sec === "right") {
-          root.currentSectionState = sec
-        }
-      })
-    }
+    Quickshell.execDetached(["python3", "-c", "import json, os; p = os.path.expanduser('~/.config/omarchy/shell.json'); d = json.load(open(p)) if os.path.exists(p) else {}; b = d.get('bar', {}); l = b.get('layout', b); res = [s for s in ('left','center','right') if any((isinstance(x, dict) and x.get('id') in ('dorneles.omameet','omameet')) or x in ('dorneles.omameet','omameet') for x in l.get(s, []))]; print(res[0] if res else 'left')"], function(secOut) {
+      var s = (secOut || "").trim().toLowerCase()
+      if (s === "left" || s === "center" || s === "right") {
+        root.currentSectionState = s
+      }
+    })
   }
 
   function addFeed() {
@@ -426,7 +445,7 @@ Panel {
               implicitHeight: Style.space(24)
               text: "Left (Default)"
               iconText: "󰁍"
-              selected: root.currentSectionState === "left"
+              selected: root.liveBarSection === "left"
               accent: Color.accent
               tooltipText: "Position plugin on the left side of the top bar"
               onClicked: root.setBarSection("left")
@@ -437,7 +456,7 @@ Panel {
               implicitHeight: Style.space(24)
               text: "Center"
               iconText: "󰁌"
-              selected: root.currentSectionState === "center"
+              selected: root.liveBarSection === "center"
               accent: Color.accent
               tooltipText: "Position plugin in the center of the top bar"
               onClicked: root.setBarSection("center")
@@ -448,7 +467,7 @@ Panel {
               implicitHeight: Style.space(24)
               text: "Right"
               iconText: "󰁔"
-              selected: root.currentSectionState === "right"
+              selected: root.liveBarSection === "right"
               accent: Color.accent
               tooltipText: "Position plugin on the right side of the top bar"
               onClicked: root.setBarSection("right")
