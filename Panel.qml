@@ -227,31 +227,34 @@ Panel {
     owner: root.barIdentity
     bar: root.bar
     open: root.opened
-    contentWidth: root.inSettingsView ? Style.space(350) : Style.space(290)
-    contentHeight: root.inSettingsView ? Style.space(520) : (contentColumn.implicitHeight + Style.space(24))
+    contentWidth: root.inSettingsView ? Style.space(370) : Style.space(290)
+    contentHeight: root.inSettingsView ? (settingsColumn.implicitHeight + Style.space(24)) : (contentColumn.implicitHeight + Style.space(24))
 
     PanelKeyCatcher {
       id: keyCatcher
       anchors.fill: parent
       onCloseRequested: root.close()
 
-      // ==========================================
-      // --- SETTINGS VIEW ---
-      // ==========================================
-      ColumnLayout {
+      // =========================================================
+      // --- SETTINGS VIEW (ZERO SCROLLING - ALL IN ONE VIEW) ---
+      // =========================================================
+      Column {
+        id: settingsColumn
         visible: root.inSettingsView
-        anchors.fill: parent
-        anchors.margins: Style.space(12)
-        spacing: Style.space(10)
+        width: parent.width - Style.space(16)
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: Style.space(10)
+        spacing: Style.space(8)
 
         // Header with Back button
         RowLayout {
-          Layout.fillWidth: true
+          width: parent.width
           spacing: Style.space(8)
 
           Button {
-            implicitWidth: Style.space(28)
-            implicitHeight: Style.space(28)
+            implicitWidth: Style.space(26)
+            implicitHeight: Style.space(26)
             iconText: "←"
             tooltipText: "Back to Agenda"
             onClicked: root.inSettingsView = false
@@ -268,386 +271,382 @@ Panel {
           Item { Layout.fillWidth: true }
 
           Button {
-            implicitWidth: Style.space(28)
-            implicitHeight: Style.space(28)
+            implicitWidth: Style.space(26)
+            implicitHeight: Style.space(26)
             iconText: "✕"
             tooltipText: "Close"
             onClicked: root.close()
           }
         }
 
-        PanelSeparator { Layout.fillWidth: true }
+        Rectangle {
+          width: parent.width
+          height: 1
+          color: Color.popups.border
+        }
 
-        ScrollView {
-          Layout.fillWidth: true
-          Layout.fillHeight: true
-          clip: true
+        // Section: Display & Length
+        Item {
+          width: parent.width
+          height: Style.space(16)
+          Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: "STATUS BAR"
+            color: Color.muted
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption * 0.85
+            font.bold: true
+          }
+        }
 
-          ColumnLayout {
-            width: parent.width
-            spacing: Style.space(10)
+        // 1. Max Title Length Stepper
+        Item {
+          width: parent.width
+          height: Style.space(28)
 
-            // --- Section: Bar Display Preferences ---
+          RowLayout {
+            anchors.fill: parent
+            spacing: Style.space(8)
+
             Text {
-              text: "Status Bar Display"
-              color: Color.muted
+              Layout.fillWidth: true
+              text: "Max Title Length (" + root.maxTitleLengthState + " chars)"
+              color: root.foreground
               font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              font.bold: true
-            }
-
-            // --- Character Limit (Length) Stepper Row (BORDERLESS) ---
-            Item {
-              Layout.fillWidth: true
-              implicitHeight: Style.space(36)
-
-              RowLayout {
-                anchors.fill: parent
-                spacing: Style.space(8)
-
-                ColumnLayout {
-                  Layout.fillWidth: true
-                  spacing: Style.space(2)
-
-                  Text {
-                    text: "Max Title Length"
-                    color: root.foreground
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                  }
-
-                  Text {
-                    text: root.maxTitleLengthState + " characters"
-                    color: Color.muted
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                  }
-                }
-
-                Button {
-                  implicitWidth: Style.space(26)
-                  implicitHeight: Style.space(26)
-                  text: "-"
-                  tooltipText: "Decrease character limit"
-                  onClicked: root.changeMaxTitleLength(-5)
-                }
-
-                Button {
-                  implicitWidth: Style.space(26)
-                  implicitHeight: Style.space(26)
-                  text: "+"
-                  tooltipText: "Increase character limit"
-                  onClicked: root.changeMaxTitleLength(5)
-                }
-
-                Button {
-                  visible: root.maxTitleLengthState !== 25
-                  implicitWidth: Style.space(26)
-                  implicitHeight: Style.space(26)
-                  iconText: "↺"
-                  tooltipText: "Reset to default (25 chars)"
-                  onClicked: root.resetMaxTitleLength()
-                }
-              }
-            }
-
-            // --- BORDERLESS Switch Rows ---
-            // 1. Marquee Text Animation Switch
-            Item {
-              Layout.fillWidth: true
-              implicitHeight: Style.space(36)
-
-              MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.toggleMarquee()
-              }
-
-              RowLayout {
-                anchors.fill: parent
-                spacing: Style.space(8)
-
-                ColumnLayout {
-                  Layout.fillWidth: true
-                  spacing: Style.space(2)
-
-                  Text {
-                    text: "Marquee Text Animation"
-                    color: root.foreground
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                  }
-
-                  Text {
-                    text: "Scroll titles exceeding character limit"
-                    color: Color.muted
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                  }
-                }
-
-                ToggleSwitch {
-                  checked: root.marqueeEnabledState
-                  interactive: false
-                }
-              }
-            }
-
-            // 2. Pause Music on Join Switch
-            Item {
-              Layout.fillWidth: true
-              implicitHeight: Style.space(36)
-
-              MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.togglePauseMusic()
-              }
-
-              RowLayout {
-                anchors.fill: parent
-                spacing: Style.space(8)
-
-                ColumnLayout {
-                  Layout.fillWidth: true
-                  spacing: Style.space(2)
-
-                  Text {
-                    text: "Pause Music on Join"
-                    color: root.foreground
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                  }
-
-                  Text {
-                    text: "Pause media players when joining call"
-                    color: Color.muted
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                  }
-                }
-
-                ToggleSwitch {
-                  checked: root.pauseMusicState
-                  interactive: false
-                }
-              }
-            }
-
-            // 3. Desktop Meeting Reminders Switch
-            Item {
-              Layout.fillWidth: true
-              implicitHeight: Style.space(36)
-
-              MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.toggleNotifications()
-              }
-
-              RowLayout {
-                anchors.fill: parent
-                spacing: Style.space(8)
-
-                ColumnLayout {
-                  Layout.fillWidth: true
-                  spacing: Style.space(2)
-
-                  Text {
-                    text: "Desktop Reminders"
-                    color: root.foreground
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                  }
-
-                  Text {
-                    text: "Send alert before meetings start"
-                    color: Color.muted
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                  }
-                }
-
-                ToggleSwitch {
-                  checked: root.notificationsEnabledState
-                  interactive: false
-                }
-              }
-            }
-
-            // 4. Hide Declined Events Switch
-            Item {
-              Layout.fillWidth: true
-              implicitHeight: Style.space(36)
-
-              MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                onClicked: root.toggleHideDeclined()
-              }
-
-              RowLayout {
-                anchors.fill: parent
-                spacing: Style.space(8)
-
-                ColumnLayout {
-                  Layout.fillWidth: true
-                  spacing: Style.space(2)
-
-                  Text {
-                    text: "Hide Declined Events"
-                    color: root.foreground
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.body
-                  }
-
-                  Text {
-                    text: "Filter out declined or cancelled events"
-                    color: Color.muted
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                  }
-                }
-
-                ToggleSwitch {
-                  checked: root.hideDeclinedState
-                  interactive: false
-                }
-              }
-            }
-
-            PanelSeparator { Layout.fillWidth: true }
-
-            // --- Section: Bookmarks Manager ---
-            Text {
-              text: "Add Quick Bookmark / Room"
-              color: Color.muted
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              font.bold: true
-            }
-
-            TextField {
-              Layout.fillWidth: true
-              placeholderText: "Room Name (e.g. Daily Room)"
-              text: root.newBmName
-              onTextChanged: root.newBmName = text
-            }
-
-            TextField {
-              Layout.fillWidth: true
-              placeholderText: "https://meet.google.com/xyz or meet.jit.si/..."
-              text: root.newBmUrl
-              onTextChanged: root.newBmUrl = text
+              font.pixelSize: Style.font.body * 0.95
             }
 
             Button {
-              Layout.fillWidth: true
-              implicitHeight: Style.space(30)
-              text: "Add Bookmark"
-              iconText: "󰃃"
-              accent: Color.accent
-              foreground: "#FFFFFF"
-              onClicked: root.addBookmark()
-            }
-
-            PanelSeparator { Layout.fillWidth: true }
-
-            // --- Section: Add Calendar Feed ---
-            Text {
-              text: "Add Calendar Feed (.ics / webcal://)"
-              color: Color.muted
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              font.bold: true
-            }
-
-            TextField {
-              Layout.fillWidth: true
-              placeholderText: "Calendar Name (e.g. Work)"
-              text: root.newFeedName
-              onTextChanged: root.newFeedName = text
-            }
-
-            TextField {
-              Layout.fillWidth: true
-              placeholderText: "https://calendar.google.com/.../basic.ics"
-              text: root.newFeedUrl
-              onTextChanged: root.newFeedUrl = text
+              implicitWidth: Style.space(24)
+              implicitHeight: Style.space(24)
+              text: "-"
+              tooltipText: "Decrease length"
+              onClicked: root.changeMaxTitleLength(-5)
             }
 
             Button {
-              Layout.fillWidth: true
-              implicitHeight: Style.space(30)
-              text: "Add Calendar Feed"
-              iconText: "󰐕"
-              accent: Color.accent
-              foreground: "#FFFFFF"
-              onClicked: root.addFeed()
+              implicitWidth: Style.space(24)
+              implicitHeight: Style.space(24)
+              text: "+"
+              tooltipText: "Increase length"
+              onClicked: root.changeMaxTitleLength(5)
             }
 
-            PanelSeparator { Layout.fillWidth: true }
-
-            // --- Section: Connected Feeds ---
-            Text {
-              text: "Connected Feeds (" + root.feedsList.length + ")"
-              color: Color.muted
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-              font.bold: true
-            }
-
-            Repeater {
-              model: root.feedsList
-
-              Rectangle {
-                required property var modelData
-                Layout.fillWidth: true
-                implicitHeight: Style.space(36)
-                color: Color.popups.surface
-                radius: Style.space(4)
-                border.color: Color.popups.border
-                border.width: 1
-
-                RowLayout {
-                  anchors.fill: parent
-                  anchors.margins: Style.space(6)
-                  spacing: Style.space(6)
-
-                  Rectangle {
-                    width: Style.space(8)
-                    height: Style.space(8)
-                    radius: Style.space(4)
-                    color: modelData.color || "#3B82F6"
-                  }
-
-                  Text {
-                    Layout.fillWidth: true
-                    text: modelData.name || "Calendar"
-                    color: root.foreground
-                    font.family: root.fontFamily
-                    font.pixelSize: Style.font.caption
-                    font.bold: true
-                    elide: Text.ElideRight
-                  }
-
-                  Button {
-                    implicitWidth: Style.space(24)
-                    implicitHeight: Style.space(24)
-                    iconText: "🗑"
-                    foreground: Color.urgent
-                    accent: Color.urgent
-                    onClicked: root.removeFeed(modelData.id)
-                  }
-                }
-              }
-            }
-
-            Item {
-              Layout.fillWidth: true
-              implicitHeight: Style.space(12)
+            Button {
+              visible: root.maxTitleLengthState !== 25
+              implicitWidth: Style.space(24)
+              implicitHeight: Style.space(24)
+              iconText: "↺"
+              tooltipText: "Reset default (25 chars)"
+              onClicked: root.resetMaxTitleLength()
             }
           }
+        }
+
+        // 2. Marquee Switch (Borderless)
+        Item {
+          width: parent.width
+          height: Style.space(28)
+
+          MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.toggleMarquee()
+          }
+
+          RowLayout {
+            anchors.fill: parent
+            spacing: Style.space(8)
+
+            Text {
+              Layout.fillWidth: true
+              text: "Marquee text animation"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body * 0.95
+            }
+
+            ToggleSwitch {
+              checked: root.marqueeEnabledState
+              interactive: false
+            }
+          }
+        }
+
+        // 3. Pause Music Switch (Borderless)
+        Item {
+          width: parent.width
+          height: Style.space(28)
+
+          MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.togglePauseMusic()
+          }
+
+          RowLayout {
+            anchors.fill: parent
+            spacing: Style.space(8)
+
+            Text {
+              Layout.fillWidth: true
+              text: "Pause music on call join"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body * 0.95
+            }
+
+            ToggleSwitch {
+              checked: root.pauseMusicState
+              interactive: false
+            }
+          }
+        }
+
+        // 4. Desktop Reminders Switch (Borderless)
+        Item {
+          width: parent.width
+          height: Style.space(28)
+
+          MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.toggleNotifications()
+          }
+
+          RowLayout {
+            anchors.fill: parent
+            spacing: Style.space(8)
+
+            Text {
+              Layout.fillWidth: true
+              text: "Desktop meeting reminders"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body * 0.95
+            }
+
+            ToggleSwitch {
+              checked: root.notificationsEnabledState
+              interactive: false
+            }
+          }
+        }
+
+        // 5. Hide Declined Switch (Borderless)
+        Item {
+          width: parent.width
+          height: Style.space(28)
+
+          MouseArea {
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            onClicked: root.toggleHideDeclined()
+          }
+
+          RowLayout {
+            anchors.fill: parent
+            spacing: Style.space(8)
+
+            Text {
+              Layout.fillWidth: true
+              text: "Hide declined calendar events"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body * 0.95
+            }
+
+            ToggleSwitch {
+              checked: root.hideDeclinedState
+              interactive: false
+            }
+          }
+        }
+
+        Rectangle {
+          width: parent.width
+          height: 1
+          color: Color.popups.border
+        }
+
+        // Section: Connected Feeds
+        Item {
+          width: parent.width
+          height: Style.space(16)
+          Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: "CONNECTED CALENDARS (" + root.feedsList.length + ")"
+            color: Color.muted
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption * 0.85
+            font.bold: true
+          }
+        }
+
+        Repeater {
+          model: root.feedsList
+
+          Item {
+            required property var modelData
+            width: parent.width
+            height: Style.space(26)
+
+            RowLayout {
+              anchors.fill: parent
+              spacing: Style.space(6)
+
+              Rectangle {
+                width: Style.space(8)
+                height: Style.space(8)
+                radius: Style.space(4)
+                color: modelData.color || "#3B82F6"
+              }
+
+              Text {
+                Layout.fillWidth: true
+                text: modelData.name || "Calendar"
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body * 0.95
+                elide: Text.ElideRight
+              }
+
+              Button {
+                implicitWidth: Style.space(22)
+                implicitHeight: Style.space(22)
+                iconText: "🗑"
+                foreground: Color.urgent
+                accent: Color.urgent
+                onClicked: root.removeFeed(modelData.id)
+              }
+            }
+          }
+        }
+
+        // Inline Add Feed Row
+        RowLayout {
+          width: parent.width
+          spacing: Style.space(6)
+
+          TextField {
+            Layout.preferredWidth: Style.space(90)
+            placeholderText: "Name (Work)"
+            text: root.newFeedName
+            onTextChanged: root.newFeedName = text
+          }
+
+          TextField {
+            Layout.fillWidth: true
+            placeholderText: "Feed URL (.ics / webcal://)"
+            text: root.newFeedUrl
+            onTextChanged: root.newFeedUrl = text
+          }
+
+          Button {
+            implicitWidth: Style.space(30)
+            implicitHeight: Style.space(30)
+            iconText: "󰐕"
+            tooltipText: "Add calendar feed"
+            accent: Color.accent
+            foreground: "#FFFFFF"
+            onClicked: root.addFeed()
+          }
+        }
+
+        Rectangle {
+          width: parent.width
+          height: 1
+          color: Color.popups.border
+        }
+
+        // Section: Quick Bookmarks
+        Item {
+          width: parent.width
+          height: Style.space(16)
+          Text {
+            anchors.verticalCenter: parent.verticalCenter
+            text: "BOOKMARKS (" + root.bookmarksList.length + ")"
+            color: Color.muted
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption * 0.85
+            font.bold: true
+          }
+        }
+
+        Repeater {
+          model: root.bookmarksList
+
+          Item {
+            required property var modelData
+            width: parent.width
+            height: Style.space(26)
+
+            RowLayout {
+              anchors.fill: parent
+              spacing: Style.space(6)
+
+              Text {
+                text: "󰌹"
+                color: Color.muted
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+              }
+
+              Text {
+                Layout.fillWidth: true
+                text: modelData.name || "Room"
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body * 0.95
+                elide: Text.ElideRight
+              }
+
+              Button {
+                implicitWidth: Style.space(22)
+                implicitHeight: Style.space(22)
+                iconText: "🗑"
+                foreground: Color.urgent
+                accent: Color.urgent
+                onClicked: root.removeBookmark(modelData.id)
+              }
+            }
+          }
+        }
+
+        // Inline Add Bookmark Row
+        RowLayout {
+          width: parent.width
+          spacing: Style.space(6)
+
+          TextField {
+            Layout.preferredWidth: Style.space(90)
+            placeholderText: "Room Name"
+            text: root.newBmName
+            onTextChanged: root.newBmName = text
+          }
+
+          TextField {
+            Layout.fillWidth: true
+            placeholderText: "Meeting Room URL"
+            text: root.newBmUrl
+            onTextChanged: root.newBmUrl = text
+          }
+
+          Button {
+            implicitWidth: Style.space(30)
+            implicitHeight: Style.space(30)
+            iconText: "󰐕"
+            tooltipText: "Add bookmark"
+            accent: Color.accent
+            foreground: "#FFFFFF"
+            onClicked: root.addBookmark()
+          }
+        }
+
+        // Bottom breathing space
+        Item {
+          width: parent.width
+          height: Style.space(6)
         }
       }
 
