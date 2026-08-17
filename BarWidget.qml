@@ -12,12 +12,13 @@ BarWidget {
   moduleName: "dorneles.omameet"
 
   // Local optimistic overrides to guarantee zero-latency reactive updates
+  property string customFormat: ""
   property int customMaxTitleLength: -1
   property int customMarqueeEnabled: -1
   property int customEnableNotifications: -1
 
   // Settings dynamically read from root.settings (persisted in shell.json)
-  readonly property string currentFormat: (root.settings && root.settings.format !== undefined) ? root.settings.format : "title_countdown"
+  readonly property string currentFormat: customFormat !== "" ? customFormat : ((root.settings && root.settings.format !== undefined) ? root.settings.format : "title_countdown")
   readonly property int currentMaxTitleLength: customMaxTitleLength > 0 ? customMaxTitleLength : ((root.settings && root.settings.maxTitleLength !== undefined) ? Number(root.settings.maxTitleLength) : 35)
   readonly property bool currentMarqueeEnabled: customMarqueeEnabled >= 0 ? (customMarqueeEnabled === 1) : ((root.settings && root.settings.marqueeEnabled !== undefined) ? root.settings.marqueeEnabled : false)
   readonly property int currentMarqueeSpeed: (root.settings && root.settings.marqueeSpeed !== undefined) ? root.settings.marqueeSpeed : 6
@@ -88,6 +89,7 @@ BarWidget {
   }
 
   function updateSetting(key, value) {
+    if (key === "format") customFormat = value
     if (key === "maxTitleLength") customMaxTitleLength = value
     if (key === "marqueeEnabled") customMarqueeEnabled = value ? 1 : 0
     if (key === "enableNotifications") customEnableNotifications = value ? 1 : 0

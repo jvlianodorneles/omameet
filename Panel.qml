@@ -39,6 +39,7 @@ Panel {
   property string newBmUrl: ""
 
   // Settings tracked locally for reactive instant UI response
+  property string formatState: hostWidget ? (hostWidget.currentFormat || "title_countdown") : "title_countdown"
   property int maxTitleLengthState: hostWidget ? (hostWidget.currentMaxTitleLength || 35) : 35
   property bool marqueeEnabledState: hostWidget ? hostWidget.currentMarqueeEnabled : false
   property bool notificationsEnabledState: hostWidget ? hostWidget.currentEnableNotifications : true
@@ -85,6 +86,7 @@ Panel {
 
   onHostWidgetChanged: {
     if (hostWidget) {
+      formatState = hostWidget.currentFormat || "title_countdown"
       maxTitleLengthState = hostWidget.currentMaxTitleLength || 35
       marqueeEnabledState = hostWidget.currentMarqueeEnabled
       notificationsEnabledState = hostWidget.currentEnableNotifications
@@ -109,6 +111,7 @@ Panel {
   function open() {
     inSettingsView = false
     if (hostWidget) {
+      formatState = hostWidget.currentFormat || "title_countdown"
       maxTitleLengthState = hostWidget.currentMaxTitleLength || 35
       marqueeEnabledState = hostWidget.currentMarqueeEnabled
       notificationsEnabledState = hostWidget.currentEnableNotifications
@@ -132,6 +135,11 @@ Panel {
     } else if (syncScriptPath !== "") {
       Quickshell.execDetached(["python3", syncScriptPath, "sync"])
     }
+  }
+
+  function setDisplayFormat(fmt) {
+    root.formatState = fmt
+    updateWidgetSetting("format", fmt)
   }
 
   function joinMeeting(url) {
@@ -189,6 +197,9 @@ Panel {
           root.pauseMusicState = parsed.settings.pauseMusicOnJoin !== false
           root.muteMicState = parsed.settings.muteMicOnJoin === true
           root.hideDeclinedState = parsed.settings.hideDeclined !== false
+          if (parsed.settings.format) {
+            root.formatState = parsed.settings.format
+          }
           if (parsed.settings.defaultInstantMeetingProvider) {
             root.instantMeetingProviderState = parsed.settings.defaultInstantMeetingProvider
           }
@@ -424,7 +435,93 @@ Panel {
           }
         }
 
-        // 2. Bar Position Selector (Left, Center, Right)
+        // 2. Display Format Selector (2-row segmented layout, zero overlap)
+        Column {
+          width: parent.width
+          spacing: Style.space(4)
+
+          Text {
+            text: "Display Format"
+            color: root.foreground
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.body * 0.95
+          }
+
+          RowLayout {
+            width: parent.width
+            spacing: Style.space(4)
+
+            Button {
+              Layout.fillWidth: true
+              implicitHeight: Style.space(24)
+              text: "Title + Time"
+              selected: root.formatState === "title_countdown"
+              accent: Color.accent
+              tooltipText: "Event title with countdown (Default)"
+              onClicked: root.setDisplayFormat("title_countdown")
+            }
+
+            Button {
+              Layout.fillWidth: true
+              implicitHeight: Style.space(24)
+              text: "Icon + Title"
+              iconText: "󰄚"
+              selected: root.formatState === "icon_title_countdown"
+              accent: Color.accent
+              tooltipText: "Provider icon with title and countdown"
+              onClicked: root.setDisplayFormat("icon_title_countdown")
+            }
+
+            Button {
+              Layout.fillWidth: true
+              implicitHeight: Style.space(24)
+              text: "Time only"
+              selected: root.formatState === "countdown_only"
+              accent: Color.accent
+              tooltipText: "Countdown time to meeting only"
+              onClicked: root.setDisplayFormat("countdown_only")
+            }
+          }
+
+          RowLayout {
+            width: parent.width
+            spacing: Style.space(4)
+
+            Button {
+              Layout.fillWidth: true
+              implicitHeight: Style.space(24)
+              text: "Icon + Clock"
+              iconText: "󰄚"
+              selected: root.formatState === "icon_time"
+              accent: Color.accent
+              tooltipText: "Provider icon with start time"
+              onClicked: root.setDisplayFormat("icon_time")
+            }
+
+            Button {
+              Layout.fillWidth: true
+              implicitHeight: Style.space(24)
+              text: "Title only"
+              selected: root.formatState === "title_only"
+              accent: Color.accent
+              tooltipText: "Event title only"
+              onClicked: root.setDisplayFormat("title_only")
+            }
+
+            Button {
+              Layout.fillWidth: true
+              implicitHeight: Style.space(24)
+              text: "Icon only"
+              iconText: "󰄚"
+              selected: root.formatState === "icon_only"
+              accent: Color.accent
+              tooltipText: "Provider icon only"
+              onClicked: root.setDisplayFormat("icon_only")
+            }
+          }
+        }
+
+        // 3. Bar Position Selector (Left, Center, Right)
         Column {
           width: parent.width
           spacing: Style.space(4)
