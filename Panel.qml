@@ -38,18 +38,18 @@ Panel {
   property string newBmName: ""
   property string newBmUrl: ""
 
-  // Settings tracked locally for reactive instant toggle response
+  // Settings tracked locally for reactive instant UI response
+  property int maxTitleLengthState: hostWidget ? (hostWidget.currentMaxTitleLength || 25) : 25
   property bool marqueeEnabledState: hostWidget ? hostWidget.currentMarqueeEnabled : false
   property bool notificationsEnabledState: hostWidget ? hostWidget.currentEnableNotifications : true
-  property int fontSizeState: hostWidget ? (hostWidget.currentFontSize || 0) : 0
   property bool pauseMusicState: true
   property bool hideDeclinedState: true
 
   onHostWidgetChanged: {
     if (hostWidget) {
+      maxTitleLengthState = hostWidget.currentMaxTitleLength || 25
       marqueeEnabledState = hostWidget.currentMarqueeEnabled
       notificationsEnabledState = hostWidget.currentEnableNotifications
-      fontSizeState = hostWidget.currentFontSize || 0
     }
   }
 
@@ -71,9 +71,9 @@ Panel {
   function open() {
     inSettingsView = false
     if (hostWidget) {
+      maxTitleLengthState = hostWidget.currentMaxTitleLength || 25
       marqueeEnabledState = hostWidget.currentMarqueeEnabled
       notificationsEnabledState = hostWidget.currentEnableNotifications
-      fontSizeState = hostWidget.currentFontSize || 0
     }
     loadConfigData()
     controller.show()
@@ -131,6 +131,9 @@ Panel {
         if (parsed.settings) {
           root.pauseMusicState = parsed.settings.pauseMusicOnJoin !== false
           root.hideDeclinedState = parsed.settings.hideDeclined !== false
+          if (parsed.settings.maxTitleLength !== undefined) {
+            root.maxTitleLengthState = parsed.settings.maxTitleLength
+          }
         }
       } catch (e) {}
     })
@@ -178,16 +181,15 @@ Panel {
     }
   }
 
-  function changeFontSize(delta) {
-    var base = root.fontSizeState > 0 ? root.fontSizeState : Math.round(Style.font.body)
-    var target = Math.max(8, Math.min(28, base + delta))
-    root.fontSizeState = target
-    updateWidgetSetting("fontSize", target)
+  function changeMaxTitleLength(delta) {
+    var target = Math.max(5, Math.min(80, root.maxTitleLengthState + delta))
+    root.maxTitleLengthState = target
+    updateWidgetSetting("maxTitleLength", target)
   }
 
-  function resetFontSize() {
-    root.fontSizeState = 0
-    updateWidgetSetting("fontSize", 0)
+  function resetMaxTitleLength() {
+    root.maxTitleLengthState = 25
+    updateWidgetSetting("maxTitleLength", 25)
   }
 
   function toggleMarquee() {
@@ -215,7 +217,6 @@ Panel {
     if (hostWidget && typeof hostWidget.updateSetting === "function") {
       hostWidget.updateSetting(key, value)
     }
-    // Also save directly to config.json
     var valStr = typeof value === "number" ? String(value) : (value ? "True" : "False")
     Quickshell.execDetached(["python3", "-c", "import json, os; p = os.path.expanduser('~/.local/state/omarchy/omameet/config.json'); d = json.load(open(p)); d.setdefault('settings', {})['" + key + "'] = " + valStr + "; json.dump(d, open(p, 'w'), indent=2)"])
   }
@@ -226,8 +227,8 @@ Panel {
     owner: root.barIdentity
     bar: root.bar
     open: root.opened
-    contentWidth: root.inSettingsView ? Style.space(360) : Style.space(290)
-    contentHeight: root.inSettingsView ? Style.space(520) : Math.min(Style.space(540), contentColumn.implicitHeight + Style.space(16))
+    contentWidth: root.inSettingsView ? Style.space(350) : Style.space(290)
+    contentHeight: root.inSettingsView ? Style.space(520) : (contentColumn.implicitHeight + Style.space(24))
 
     PanelKeyCatcher {
       id: keyCatcher
@@ -240,8 +241,10 @@ Panel {
       ColumnLayout {
         visible: root.inSettingsView
         anchors.fill: parent
-        spacing: Style.space(8)
+        anchors.margins: Style.space(12)
+        spacing: Style.space(10)
 
+        // Header with Back button
         RowLayout {
           Layout.fillWidth: true
           spacing: Style.space(8)
@@ -284,27 +287,22 @@ Panel {
             width: parent.width
             spacing: Style.space(10)
 
-            // --- Section: Automation & Preferences ---
+            // --- Section: Bar Display Preferences ---
             Text {
-              text: "Visual & Automation Preferences"
+              text: "Status Bar Display"
               color: Color.muted
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
               font.bold: true
             }
 
-            // --- Font Size Adjustment Row ---
-            BorderSurface {
+            // --- Character Limit (Length) Stepper Row (BORDERLESS) ---
+            Item {
               Layout.fillWidth: true
-              implicitHeight: Style.space(48)
-              radius: Style.cornerRadius
-              color: Style.controlFill(false, false, root.foreground, Color.accent)
-              borderSpec: Border.controlSpec("normal", root.foreground, Color.accent)
+              implicitHeight: Style.space(36)
 
               RowLayout {
                 anchors.fill: parent
-                anchors.leftMargin: Style.space(12)
-                anchors.rightMargin: Style.space(12)
                 spacing: Style.space(8)
 
                 ColumnLayout {
@@ -312,15 +310,14 @@ Panel {
                   spacing: Style.space(2)
 
                   Text {
-                    text: "Bar Text Font Size"
+                    text: "Max Title Length"
                     color: root.foreground
                     font.family: root.fontFamily
-                    font.pixelSize: Style.font.subtitle
-                    font.bold: true
+                    font.pixelSize: Style.font.body
                   }
 
                   Text {
-                    text: root.fontSizeState === 0 ? "Default (" + Math.round(Style.font.body) + " px)" : (root.fontSizeState + " px")
+                    text: root.maxTitleLengthState + " characters"
                     color: Color.muted
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.caption
@@ -328,62 +325,195 @@ Panel {
                 }
 
                 Button {
-                  implicitWidth: Style.space(28)
-                  implicitHeight: Style.space(28)
+                  implicitWidth: Style.space(26)
+                  implicitHeight: Style.space(26)
                   text: "-"
-                  tooltipText: "Decrease text size"
-                  onClicked: root.changeFontSize(-1)
+                  tooltipText: "Decrease character limit"
+                  onClicked: root.changeMaxTitleLength(-5)
                 }
 
                 Button {
-                  implicitWidth: Style.space(28)
-                  implicitHeight: Style.space(28)
+                  implicitWidth: Style.space(26)
+                  implicitHeight: Style.space(26)
                   text: "+"
-                  tooltipText: "Increase text size"
-                  onClicked: root.changeFontSize(1)
+                  tooltipText: "Increase character limit"
+                  onClicked: root.changeMaxTitleLength(5)
                 }
 
                 Button {
-                  visible: root.fontSizeState !== 0
-                  implicitWidth: Style.space(28)
-                  implicitHeight: Style.space(28)
+                  visible: root.maxTitleLengthState !== 25
+                  implicitWidth: Style.space(26)
+                  implicitHeight: Style.space(26)
                   iconText: "↺"
-                  tooltipText: "Reset to default size"
-                  onClicked: root.resetFontSize()
+                  tooltipText: "Reset to default (25 chars)"
+                  onClicked: root.resetMaxTitleLength()
                 }
               }
             }
 
-            Toggle {
+            // --- BORDERLESS Switch Rows ---
+            // 1. Marquee Text Animation Switch
+            Item {
               Layout.fillWidth: true
-              label: "Marquee Text Animation"
-              description: "Scroll long titles on the status bar"
-              checked: root.marqueeEnabledState
-              onClicked: root.toggleMarquee()
+              implicitHeight: Style.space(36)
+
+              MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.toggleMarquee()
+              }
+
+              RowLayout {
+                anchors.fill: parent
+                spacing: Style.space(8)
+
+                ColumnLayout {
+                  Layout.fillWidth: true
+                  spacing: Style.space(2)
+
+                  Text {
+                    text: "Marquee Text Animation"
+                    color: root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                  }
+
+                  Text {
+                    text: "Scroll titles exceeding character limit"
+                    color: Color.muted
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                  }
+                }
+
+                ToggleSwitch {
+                  checked: root.marqueeEnabledState
+                  interactive: false
+                }
+              }
             }
 
-            Toggle {
+            // 2. Pause Music on Join Switch
+            Item {
               Layout.fillWidth: true
-              label: "Pause Music on Join"
-              description: "Pause Spotify/media players when entering a call"
-              checked: root.pauseMusicState
-              onClicked: root.togglePauseMusic()
+              implicitHeight: Style.space(36)
+
+              MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.togglePauseMusic()
+              }
+
+              RowLayout {
+                anchors.fill: parent
+                spacing: Style.space(8)
+
+                ColumnLayout {
+                  Layout.fillWidth: true
+                  spacing: Style.space(2)
+
+                  Text {
+                    text: "Pause Music on Join"
+                    color: root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                  }
+
+                  Text {
+                    text: "Pause media players when joining call"
+                    color: Color.muted
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                  }
+                }
+
+                ToggleSwitch {
+                  checked: root.pauseMusicState
+                  interactive: false
+                }
+              }
             }
 
-            Toggle {
+            // 3. Desktop Meeting Reminders Switch
+            Item {
               Layout.fillWidth: true
-              label: "Desktop Meeting Reminders"
-              description: "Send alert before meetings start"
-              checked: root.notificationsEnabledState
-              onClicked: root.toggleNotifications()
+              implicitHeight: Style.space(36)
+
+              MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.toggleNotifications()
+              }
+
+              RowLayout {
+                anchors.fill: parent
+                spacing: Style.space(8)
+
+                ColumnLayout {
+                  Layout.fillWidth: true
+                  spacing: Style.space(2)
+
+                  Text {
+                    text: "Desktop Reminders"
+                    color: root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                  }
+
+                  Text {
+                    text: "Send alert before meetings start"
+                    color: Color.muted
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                  }
+                }
+
+                ToggleSwitch {
+                  checked: root.notificationsEnabledState
+                  interactive: false
+                }
+              }
             }
 
-            Toggle {
+            // 4. Hide Declined Events Switch
+            Item {
               Layout.fillWidth: true
-              label: "Hide Declined Events"
-              description: "Filter out declined or cancelled calendar events"
-              checked: root.hideDeclinedState
-              onClicked: root.toggleHideDeclined()
+              implicitHeight: Style.space(36)
+
+              MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.toggleHideDeclined()
+              }
+
+              RowLayout {
+                anchors.fill: parent
+                spacing: Style.space(8)
+
+                ColumnLayout {
+                  Layout.fillWidth: true
+                  spacing: Style.space(2)
+
+                  Text {
+                    text: "Hide Declined Events"
+                    color: root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.body
+                  }
+
+                  Text {
+                    text: "Filter out declined or cancelled events"
+                    color: Color.muted
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                  }
+                }
+
+                ToggleSwitch {
+                  checked: root.hideDeclinedState
+                  interactive: false
+                }
+              }
             }
 
             PanelSeparator { Layout.fillWidth: true }
@@ -413,7 +543,7 @@ Panel {
 
             Button {
               Layout.fillWidth: true
-              implicitHeight: Style.space(32)
+              implicitHeight: Style.space(30)
               text: "Add Bookmark"
               iconText: "󰃃"
               accent: Color.accent
@@ -448,7 +578,7 @@ Panel {
 
             Button {
               Layout.fillWidth: true
-              implicitHeight: Style.space(32)
+              implicitHeight: Style.space(30)
               text: "Add Calendar Feed"
               iconText: "󰐕"
               accent: Color.accent
@@ -473,7 +603,7 @@ Panel {
               Rectangle {
                 required property var modelData
                 Layout.fillWidth: true
-                implicitHeight: Style.space(38)
+                implicitHeight: Style.space(36)
                 color: Color.popups.surface
                 radius: Style.space(4)
                 border.color: Color.popups.border
@@ -527,7 +657,10 @@ Panel {
       Column {
         id: contentColumn
         visible: !root.inSettingsView
-        width: parent.width
+        width: parent.width - Style.space(16)
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: Style.space(8)
         spacing: Style.space(2)
 
         // 1. Header: Today (Fri, 12 Feb):
@@ -537,7 +670,7 @@ Panel {
 
           Text {
             anchors.left: parent.left
-            anchors.leftMargin: Style.space(8)
+            anchors.leftMargin: Style.space(6)
             anchors.verticalCenter: parent.verticalCenter
             text: root.todayHeader
             color: Color.muted
@@ -555,7 +688,7 @@ Panel {
 
           Text {
             anchors.left: parent.left
-            anchors.leftMargin: Style.space(16)
+            anchors.leftMargin: Style.space(14)
             anchors.verticalCenter: parent.verticalCenter
             text: "No events scheduled"
             color: Color.muted
@@ -597,9 +730,9 @@ Panel {
 
             RowLayout {
               anchors.fill: parent
-              anchors.leftMargin: Style.space(8)
-              anchors.rightMargin: Style.space(8)
-              spacing: Style.space(10)
+              anchors.leftMargin: Style.space(6)
+              anchors.rightMargin: Style.space(6)
+              spacing: Style.space(8)
 
               // Start Time
               Text {
@@ -666,8 +799,8 @@ Panel {
 
           RowLayout {
             anchors.fill: parent
-            anchors.leftMargin: Style.space(8)
-            anchors.rightMargin: Style.space(8)
+            anchors.leftMargin: Style.space(6)
+            anchors.rightMargin: Style.space(6)
 
             Text {
               Layout.fillWidth: true
@@ -703,8 +836,8 @@ Panel {
 
           RowLayout {
             anchors.fill: parent
-            anchors.leftMargin: Style.space(8)
-            anchors.rightMargin: Style.space(8)
+            anchors.leftMargin: Style.space(6)
+            anchors.rightMargin: Style.space(6)
 
             Text {
               Layout.fillWidth: true
@@ -742,7 +875,7 @@ Panel {
 
           Text {
             anchors.left: parent.left
-            anchors.leftMargin: Style.space(8)
+            anchors.leftMargin: Style.space(6)
             anchors.verticalCenter: parent.verticalCenter
             text: "Bookmarks"
             color: Color.muted
@@ -773,8 +906,8 @@ Panel {
 
             RowLayout {
               anchors.fill: parent
-              anchors.leftMargin: Style.space(8)
-              anchors.rightMargin: Style.space(8)
+              anchors.leftMargin: Style.space(6)
+              anchors.rightMargin: Style.space(6)
 
               Text {
                 Layout.fillWidth: true
@@ -814,7 +947,7 @@ Panel {
 
           Text {
             anchors.left: parent.left
-            anchors.leftMargin: Style.space(8)
+            anchors.leftMargin: Style.space(6)
             anchors.verticalCenter: parent.verticalCenter
             text: root.tomorrowHeader
             color: Color.muted
@@ -849,9 +982,9 @@ Panel {
 
             RowLayout {
               anchors.fill: parent
-              anchors.leftMargin: Style.space(8)
-              anchors.rightMargin: Style.space(8)
-              spacing: Style.space(10)
+              anchors.leftMargin: Style.space(6)
+              anchors.rightMargin: Style.space(6)
+              spacing: Style.space(8)
 
               Text {
                 text: modelData.isAllDay ? "All Day" : modelData.start
@@ -914,8 +1047,8 @@ Panel {
 
           RowLayout {
             anchors.fill: parent
-            anchors.leftMargin: Style.space(8)
-            anchors.rightMargin: Style.space(8)
+            anchors.leftMargin: Style.space(6)
+            anchors.rightMargin: Style.space(6)
 
             Text {
               Layout.fillWidth: true
@@ -952,8 +1085,8 @@ Panel {
 
           RowLayout {
             anchors.fill: parent
-            anchors.leftMargin: Style.space(8)
-            anchors.rightMargin: Style.space(8)
+            anchors.leftMargin: Style.space(6)
+            anchors.rightMargin: Style.space(6)
 
             Text {
               Layout.fillWidth: true
