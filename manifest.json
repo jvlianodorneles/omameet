@@ -1,0 +1,145 @@
+{
+  "schemaVersion": 1,
+  "id": "dorneles.omameet",
+  "name": "omameet",
+  "version": "1.0.0",
+  "author": "Dorneles",
+  "license": "MIT",
+  "description": "Universal MeetingBar for Omarchy: Shows upcoming meetings with countdown, 1-click join (Meet, Zoom, Teams), interactive agenda popup, and desktop alerts.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "omameet",
+    "description": "Next meeting countdown, 1-click video call join, and calendar agenda popup",
+    "category": "Time",
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "format": "title_countdown",
+      "maxTitleLength": 25,
+      "marqueeEnabled": false,
+      "marqueeSpeed": 6,
+      "showIcon": true,
+      "showCountdown": true,
+      "refreshIntervalMin": 15,
+      "urgentThresholdMin": 5,
+      "enableNotifications": true,
+      "notificationLeadMin": 5,
+      "hideAllDayEvents": false,
+      "hideWithoutLinks": false
+    },
+    "schema": [
+      {
+        "key": "format",
+        "type": "enum",
+        "label": "Display Format",
+        "options": [
+          "title_countdown",
+          "icon_title_countdown",
+          "countdown_only",
+          "icon_time",
+          "title_only",
+          "icon_only"
+        ],
+        "defaultValue": "title_countdown",
+        "description": "Widget text format on the status bar."
+      },
+      {
+        "key": "maxTitleLength",
+        "type": "integer",
+        "label": "Character Limit (Max Title Length)",
+        "min": 5,
+        "max": 80,
+        "step": 1,
+        "defaultValue": 25,
+        "description": "Maximum number of characters allowed for the meeting title before truncation or marquee."
+      },
+      {
+        "key": "marqueeEnabled",
+        "type": "boolean",
+        "label": "Marquee Text Animation",
+        "defaultValue": false,
+        "description": "Enable smooth horizontal scrolling for meeting titles that exceed the character limit."
+      },
+      {
+        "key": "marqueeSpeed",
+        "type": "integer",
+        "label": "Marquee Cycle Duration (seconds)",
+        "min": 2,
+        "max": 20,
+        "step": 1,
+        "defaultValue": 6,
+        "description": "Duration of the marquee scroll animation cycle in seconds."
+      },
+      {
+        "key": "showIcon",
+        "type": "boolean",
+        "label": "Show Platform / Calendar Icon",
+        "defaultValue": true,
+        "description": "Show the video platform or calendar icon before the title."
+      },
+      {
+        "key": "showCountdown",
+        "type": "boolean",
+        "label": "Show Countdown / Time Remaining",
+        "defaultValue": true,
+        "description": "Show relative time countdown (e.g. 'in 15 min' or '20 min left')."
+      },
+      {
+        "key": "refreshIntervalMin",
+        "type": "integer",
+        "label": "Auto-Refresh Interval (minutes)",
+        "min": 1,
+        "max": 120,
+        "step": 1,
+        "defaultValue": 15,
+        "description": "How often to background sync calendar feeds in minutes."
+      },
+      {
+        "key": "urgentThresholdMin",
+        "type": "integer",
+        "label": "Urgent Warning Threshold (minutes)",
+        "min": 1,
+        "max": 30,
+        "step": 1,
+        "defaultValue": 5,
+        "description": "Highlight meeting in urgent warning color when starting in less than this threshold."
+      },
+      {
+        "key": "enableNotifications",
+        "type": "boolean",
+        "label": "Desktop Meeting Reminders",
+        "defaultValue": true,
+        "description": "Send desktop notification when an upcoming meeting is about to start."
+      },
+      {
+        "key": "notificationLeadMin",
+        "type": "integer",
+        "label": "Notification Lead Time (minutes)",
+        "min": 1,
+        "max": 30,
+        "step": 1,
+        "defaultValue": 5,
+        "description": "How many minutes before the meeting to send the desktop reminder."
+      },
+      {
+        "key": "hideAllDayEvents",
+        "type": "boolean",
+        "label": "Hide All-Day Events",
+        "defaultValue": false,
+        "description": "Do not show all-day calendar events on the status bar or next meeting."
+      },
+      {
+        "key": "hideWithoutLinks",
+        "type": "boolean",
+        "label": "Only Show Events with Video Links",
+        "defaultValue": false,
+        "description": "Filter out calendar events that do not contain a video meeting link."
+      }
+    ]
+  }
+}

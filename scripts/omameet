@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# omameet - CLI wrapper for omameet plugin on Omarchy
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PYTHON_SCRIPT="$SCRIPT_DIR/omameet-sync.py"
+
+if [ ! -f "$PYTHON_SCRIPT" ]; then
+    PYTHON_SCRIPT="$HOME/.config/omarchy/plugins/dorneles.omameet/scripts/omameet-sync.py"
+fi
+
+exec python3 "$PYTHON_SCRIPT" "$@"
