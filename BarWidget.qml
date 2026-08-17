@@ -12,8 +12,9 @@ BarWidget {
   moduleName: "dorneles.omameet"
 
   // Settings dynamically read from root.settings (persisted in shell.json)
-  readonly property string currentFormat: setting("format", "icon_title_countdown")
+  readonly property string currentFormat: setting("format", "title_countdown")
   readonly property int currentMaxTitleLength: setting("maxTitleLength", 25)
+  readonly property int currentFontSize: setting("fontSize", 0)
   readonly property bool currentMarqueeEnabled: setting("marqueeEnabled", false)
   readonly property int currentMarqueeSpeed: setting("marqueeSpeed", 6)
   readonly property bool currentShowIcon: setting("showIcon", true)
@@ -64,7 +65,11 @@ BarWidget {
 
   function joinNext() {
     if (nextMeeting && nextMeeting.videoUrl) {
-      Quickshell.execDetached(["xdg-open", nextMeeting.videoUrl])
+      if (syncScriptPath !== "") {
+        Quickshell.execDetached(["python3", syncScriptPath, "launch", nextMeeting.videoUrl])
+      } else {
+        Quickshell.execDetached(["xdg-open", nextMeeting.videoUrl])
+      }
     } else {
       if (!joinProcess.running) {
         joinProcess.command = ["python3", syncScriptPath, "join"]
@@ -198,6 +203,7 @@ BarWidget {
     id: button
     anchors.fill: parent
     bar: root.bar
+    fontSize: root.currentFontSize > 0 ? root.currentFontSize : (root.bar ? root.bar.fontSize : Style.font.body)
     text: (root.vertical || root.barData.needsMarquee) ? "" : root.barData.fullText
     labelVisible: !root.vertical && !root.barData.needsMarquee
     hasVisualContent: true
@@ -254,7 +260,7 @@ BarWidget {
 
           Text {
             id: marqueeText
-            text: root.barData.rawTitle + (root.barData.countdown ? (" (" + root.barData.countdown + ")") : "")
+            text: root.barData.rawTitle + (root.barData.countdown ? (" " + root.barData.countdown) : "")
             color: root.barData.isLive ? Color.urgent : (root.barData.isSoon ? Color.warning : button.foreground)
             font.family: button.fontFamily
             font.pixelSize: button.fontSize

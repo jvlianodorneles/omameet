@@ -41,6 +41,7 @@ Panel {
   // Settings tracked locally for reactive instant toggle response
   property bool marqueeEnabledState: hostWidget ? hostWidget.currentMarqueeEnabled : false
   property bool notificationsEnabledState: hostWidget ? hostWidget.currentEnableNotifications : true
+  property int fontSizeState: hostWidget ? (hostWidget.currentFontSize || 0) : 0
   property bool pauseMusicState: true
   property bool hideDeclinedState: true
 
@@ -48,6 +49,7 @@ Panel {
     if (hostWidget) {
       marqueeEnabledState = hostWidget.currentMarqueeEnabled
       notificationsEnabledState = hostWidget.currentEnableNotifications
+      fontSizeState = hostWidget.currentFontSize || 0
     }
   }
 
@@ -71,6 +73,7 @@ Panel {
     if (hostWidget) {
       marqueeEnabledState = hostWidget.currentMarqueeEnabled
       notificationsEnabledState = hostWidget.currentEnableNotifications
+      fontSizeState = hostWidget.currentFontSize || 0
     }
     loadConfigData()
     controller.show()
@@ -175,6 +178,18 @@ Panel {
     }
   }
 
+  function changeFontSize(delta) {
+    var base = root.fontSizeState > 0 ? root.fontSizeState : Math.round(Style.font.body)
+    var target = Math.max(8, Math.min(28, base + delta))
+    root.fontSizeState = target
+    updateWidgetSetting("fontSize", target)
+  }
+
+  function resetFontSize() {
+    root.fontSizeState = 0
+    updateWidgetSetting("fontSize", 0)
+  }
+
   function toggleMarquee() {
     marqueeEnabledState = !marqueeEnabledState
     updateWidgetSetting("marqueeEnabled", marqueeEnabledState)
@@ -201,7 +216,8 @@ Panel {
       hostWidget.updateSetting(key, value)
     }
     // Also save directly to config.json
-    Quickshell.execDetached(["python3", "-c", "import json, os; p = os.path.expanduser('~/.local/state/omarchy/omameet/config.json'); d = json.load(open(p)); d.setdefault('settings', {})['" + key + "'] = " + (value ? "True" : "False") + "; json.dump(d, open(p, 'w'), indent=2)"])
+    var valStr = typeof value === "number" ? String(value) : (value ? "True" : "False")
+    Quickshell.execDetached(["python3", "-c", "import json, os; p = os.path.expanduser('~/.local/state/omarchy/omameet/config.json'); d = json.load(open(p)); d.setdefault('settings', {})['" + key + "'] = " + valStr + "; json.dump(d, open(p, 'w'), indent=2)"])
   }
 
   KeyboardPanel {
@@ -270,19 +286,72 @@ Panel {
 
             // --- Section: Automation & Preferences ---
             Text {
-              text: "Automations & Preferences"
+              text: "Visual & Automation Preferences"
               color: Color.muted
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
               font.bold: true
             }
 
-            Toggle {
+            // --- Font Size Adjustment Row ---
+            BorderSurface {
               Layout.fillWidth: true
-              label: "Pause Music on Join"
-              description: "Pause Spotify/media players when entering a call"
-              checked: root.pauseMusicState
-              onClicked: root.togglePauseMusic()
+              implicitHeight: Style.space(48)
+              radius: Style.cornerRadius
+              color: Style.controlFill(false, false, root.foreground, Color.accent)
+              borderSpec: Border.controlSpec("normal", root.foreground, Color.accent)
+
+              RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: Style.space(12)
+                anchors.rightMargin: Style.space(12)
+                spacing: Style.space(8)
+
+                ColumnLayout {
+                  Layout.fillWidth: true
+                  spacing: Style.space(2)
+
+                  Text {
+                    text: "Bar Text Font Size"
+                    color: root.foreground
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.subtitle
+                    font.bold: true
+                  }
+
+                  Text {
+                    text: root.fontSizeState === 0 ? "Default (" + Math.round(Style.font.body) + " px)" : (root.fontSizeState + " px")
+                    color: Color.muted
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                  }
+                }
+
+                Button {
+                  implicitWidth: Style.space(28)
+                  implicitHeight: Style.space(28)
+                  text: "-"
+                  tooltipText: "Decrease text size"
+                  onClicked: root.changeFontSize(-1)
+                }
+
+                Button {
+                  implicitWidth: Style.space(28)
+                  implicitHeight: Style.space(28)
+                  text: "+"
+                  tooltipText: "Increase text size"
+                  onClicked: root.changeFontSize(1)
+                }
+
+                Button {
+                  visible: root.fontSizeState !== 0
+                  implicitWidth: Style.space(28)
+                  implicitHeight: Style.space(28)
+                  iconText: "↺"
+                  tooltipText: "Reset to default size"
+                  onClicked: root.resetFontSize()
+                }
+              }
             }
 
             Toggle {
@@ -291,6 +360,14 @@ Panel {
               description: "Scroll long titles on the status bar"
               checked: root.marqueeEnabledState
               onClicked: root.toggleMarquee()
+            }
+
+            Toggle {
+              Layout.fillWidth: true
+              label: "Pause Music on Join"
+              description: "Pause Spotify/media players when entering a call"
+              checked: root.pauseMusicState
+              onClicked: root.togglePauseMusic()
             }
 
             Toggle {

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "dorneles.omameet",
   "name": "omameet",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "Dorneles",
   "license": "MIT",
   "description": "Universal MeetingBar for Omarchy: Shows upcoming meetings with countdown, 1-click join (Meet, Zoom, Teams), interactive agenda popup, bookmarks, music pause on join, and desktop alerts.",
@@ -21,6 +21,7 @@
     "defaults": {
       "format": "title_countdown",
       "maxTitleLength": 25,
+      "fontSize": 0,
       "marqueeEnabled": false,
       "marqueeSpeed": 6,
       "showIcon": true,
@@ -53,6 +54,16 @@
         ],
         "defaultValue": "title_countdown",
         "description": "Widget text format on the status bar."
+      },
+      {
+        "key": "fontSize",
+        "type": "integer",
+        "label": "Bar Text Font Size (px)",
+        "min": 0,
+        "max": 32,
+        "step": 1,
+        "defaultValue": 0,
+        "description": "Font size for the meeting title and countdown on the status bar (in pixels). Set to 0 to use system/bar default size."
       },
       {
         "key": "maxTitleLength",
