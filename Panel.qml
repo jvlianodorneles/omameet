@@ -694,10 +694,74 @@ Panel {
           }
         }
 
+        Rectangle {
+          width: parent.width
+          height: 1
+          color: Color.popups.border
+        }
+
+        // Centered Footer in Settings Window with GitHub Link
+        Item {
+          width: parent.width
+          height: Style.space(38)
+
+          ColumnLayout {
+            anchors.centerIn: parent
+            spacing: Style.space(2)
+
+            Text {
+              Layout.alignment: Qt.AlignHCenter
+              text: "omameet"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body * 0.95
+              font.bold: true
+            }
+
+            Rectangle {
+              Layout.alignment: Qt.AlignHCenter
+              height: Style.space(16)
+              width: gitRow.implicitWidth + Style.space(8)
+              radius: Style.space(3)
+              color: gitMouse.containsMouse ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
+
+              MouseArea {
+                id: gitMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                  Quickshell.execDetached(["xdg-open", "https://github.com/jvlianodorneles/omameet"])
+                }
+              }
+
+              RowLayout {
+                id: gitRow
+                anchors.centerIn: parent
+                spacing: Style.space(4)
+
+                Text {
+                  text: ""
+                  color: Color.accent
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                }
+
+                Text {
+                  text: "github.com/jvlianodorneles/omameet"
+                  color: gitMouse.containsMouse ? Color.accent : Color.muted
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                }
+              }
+            }
+          }
+        }
+
         // Bottom breathing space
         Item {
           width: parent.width
-          height: Style.space(6)
+          height: Style.space(4)
         }
       }
 
@@ -1168,7 +1232,7 @@ Panel {
           }
         }
 
-        // 6. COMPACT SINGLE-ROW FOOTER TOOLBAR
+        // 6. COMPACT FOOTER TOOLBAR
         Item { width: parent.width; height: Style.space(2) }
         Rectangle {
           width: parent.width
@@ -1187,13 +1251,7 @@ Panel {
             anchors.rightMargin: Style.space(4)
             spacing: Style.space(6)
 
-            Text {
-              Layout.fillWidth: true
-              text: "omameet"
-              color: Color.muted
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body * 0.95
-            }
+            Item { Layout.fillWidth: true }
 
             Button {
               implicitHeight: Style.space(24)
@@ -1205,6 +1263,7 @@ Panel {
 
             Button {
               implicitHeight: Style.space(24)
+              text: "Preferences..."
               iconText: "⚙"
               tooltipText: "Preferences & Calendars"
               onClicked: {
