@@ -4,6 +4,11 @@
 
 Inspired by [MeetingBar for macOS](https://github.com/leits/MeetingBar), **omameet** brings the same smooth, responsive, and lightweight meeting experience to **Omarchy Linux**.
 
+<p align="center">
+  <img src="preview.png" alt="omameet Agenda Preview" width="48%" />
+  <img src="config_omameet.png" alt="omameet Settings Preview" width="48%" />
+</p>
+
 ---
 
 ## ✨ Features
