@@ -11,17 +11,21 @@ BarWidget {
   id: root
   moduleName: "dorneles.omameet"
 
+  // Local optimistic overrides to guarantee zero-latency reactive updates
+  property int customMaxTitleLength: -1
+  property int customMarqueeEnabled: -1
+  property int customEnableNotifications: -1
+
   // Settings dynamically read from root.settings (persisted in shell.json)
-  readonly property string currentFormat: setting("format", "title_countdown")
-  readonly property int currentMaxTitleLength: setting("maxTitleLength", 25)
-  readonly property int currentFontSize: setting("fontSize", 0)
-  readonly property bool currentMarqueeEnabled: setting("marqueeEnabled", false)
-  readonly property int currentMarqueeSpeed: setting("marqueeSpeed", 6)
-  readonly property bool currentShowIcon: setting("showIcon", true)
-  readonly property bool currentShowCountdown: setting("showCountdown", true)
-  readonly property int currentRefreshIntervalMin: setting("refreshIntervalMin", 15)
-  readonly property int currentUrgentThresholdMin: setting("urgentThresholdMin", 5)
-  readonly property bool currentEnableNotifications: setting("enableNotifications", true)
+  readonly property string currentFormat: (root.settings && root.settings.format !== undefined) ? root.settings.format : "title_countdown"
+  readonly property int currentMaxTitleLength: customMaxTitleLength > 0 ? customMaxTitleLength : ((root.settings && root.settings.maxTitleLength !== undefined) ? root.settings.maxTitleLength : 25)
+  readonly property bool currentMarqueeEnabled: customMarqueeEnabled >= 0 ? (customMarqueeEnabled === 1) : ((root.settings && root.settings.marqueeEnabled !== undefined) ? root.settings.marqueeEnabled : false)
+  readonly property int currentMarqueeSpeed: (root.settings && root.settings.marqueeSpeed !== undefined) ? root.settings.marqueeSpeed : 6
+  readonly property bool currentShowIcon: (root.settings && root.settings.showIcon !== undefined) ? root.settings.showIcon : true
+  readonly property bool currentShowCountdown: (root.settings && root.settings.showCountdown !== undefined) ? root.settings.showCountdown : true
+  readonly property int currentRefreshIntervalMin: (root.settings && root.settings.refreshIntervalMin !== undefined) ? root.settings.refreshIntervalMin : 15
+  readonly property int currentUrgentThresholdMin: (root.settings && root.settings.urgentThresholdMin !== undefined) ? root.settings.urgentThresholdMin : 5
+  readonly property bool currentEnableNotifications: customEnableNotifications >= 0 ? (customEnableNotifications === 1) : ((root.settings && root.settings.enableNotifications !== undefined) ? root.settings.enableNotifications : true)
 
   // Live state parsed from state.json
   property var meetingState: null
@@ -84,6 +88,10 @@ BarWidget {
   }
 
   function updateSetting(key, value) {
+    if (key === "maxTitleLength") customMaxTitleLength = value
+    if (key === "marqueeEnabled") customMarqueeEnabled = value ? 1 : 0
+    if (key === "enableNotifications") customEnableNotifications = value ? 1 : 0
+
     var entry = { id: root.moduleName }
     for (var k in root.settings) if (k !== "id") entry[k] = root.settings[k]
     entry[key] = value
@@ -196,14 +204,15 @@ BarWidget {
     function cycleFormat(): void { root.cycleFormat() }
   }
 
-  implicitWidth: button.implicitWidth
+  readonly property real marqueeSlotWidth: Math.min(Style.space(240), Math.max(Style.space(90), root.currentMaxTitleLength * 8.5))
+
+  implicitWidth: root.vertical ? button.implicitWidth : (root.barData.needsMarquee ? (marqueeSlotWidth + Style.space(20)) : button.implicitWidth)
   implicitHeight: button.implicitHeight
 
   WidgetButton {
     id: button
     anchors.fill: parent
     bar: root.bar
-    fontSize: root.currentFontSize > 0 ? root.currentFontSize : (root.bar ? root.bar.fontSize : Style.font.body)
     text: (root.vertical || root.barData.needsMarquee) ? "" : root.barData.fullText
     labelVisible: !root.vertical && !root.barData.needsMarquee
     hasVisualContent: true
@@ -234,7 +243,7 @@ BarWidget {
       id: marqueeContainer
       visible: !root.vertical && root.barData.needsMarquee
       anchors.centerIn: parent
-      width: Math.min(Style.space(220), Math.max(Style.space(80), root.currentMaxTitleLength * 8.5))
+      width: root.marqueeSlotWidth
       height: parent.height
       clip: true
 
@@ -254,32 +263,32 @@ BarWidget {
 
         Item {
           id: marqueeClip
-          width: marqueeContainer.width - (root.barData.icon !== "" ? Style.space(20) : 0)
+          width: marqueeContainer.width - (root.barData.icon !== "" ? Style.space(18) : 0)
           height: marqueeText.implicitHeight
           clip: true
 
           Text {
             id: marqueeText
-            text: root.barData.rawTitle + (root.barData.countdown ? (" " + root.barData.countdown) : "")
+            text: (root.barData.isLive ? "🔴 " : "") + root.barData.rawTitle + (root.barData.countdown ? (" " + root.barData.countdown) : "")
             color: root.barData.isLive ? Color.urgent : (root.barData.isSoon ? Color.warning : button.foreground)
             font.family: button.fontFamily
             font.pixelSize: button.fontSize
             renderType: Text.NativeRendering
 
-            readonly property real overflowDist: Math.max(0, marqueeText.implicitWidth - marqueeClip.width + Style.space(16))
+            readonly property real overflowDist: Math.max(0, marqueeText.implicitWidth - marqueeClip.width + Style.space(8))
 
             SequentialAnimation {
               id: scrollAnim
               running: marqueeContainer.visible && marqueeText.overflowDist > 0
               loops: Animation.Infinite
 
-              PauseAnimation { duration: 1500 }
+              PauseAnimation { duration: 1200 }
               NumberAnimation {
                 target: marqueeText
                 property: "x"
                 from: 0
                 to: -marqueeText.overflowDist
-                duration: Math.max(2000, root.currentMarqueeSpeed * 1000)
+                duration: Math.max(2000, Math.round(marqueeText.overflowDist * 35))
                 easing.type: Easing.Linear
               }
               PauseAnimation { duration: 1500 }
@@ -288,7 +297,7 @@ BarWidget {
                 property: "x"
                 from: -marqueeText.overflowDist
                 to: 0
-                duration: 500
+                duration: 400
                 easing.type: Easing.OutCubic
               }
             }

@@ -126,7 +126,7 @@ function truncate(text, maxLen) {
   if (!text) return "";
   var str = String(text).trim();
   if (maxLen <= 0 || str.length <= maxLen) return str;
-  return str.substring(0, Math.max(1, maxLen - 2)) + "…";
+  return str.substring(0, Math.max(1, maxLen - 1)) + "…";
 }
 
 /**
