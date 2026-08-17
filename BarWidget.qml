@@ -160,6 +160,26 @@ BarWidget {
     running: false
   }
 
+  property int lastSeenDay: new Date().getDate()
+
+  // Suspend/Sleep watchdog: detects system wake-up immediately after suspension
+  Timer {
+    id: suspendWatchdog
+    interval: 5000
+    repeat: true
+    running: true
+    property real lastTick: Date.now()
+    onTriggered: {
+      var now = Date.now()
+      var delta = now - lastTick
+      lastTick = now
+      // If more than 12 seconds elapsed in a 5s timer, the system was suspended/sleeping
+      if (delta > 12000) {
+        root.refresh()
+      }
+    }
+  }
+
   // Periodic calendar sync timer
   Timer {
     interval: Math.max(1, root.currentRefreshIntervalMin) * 60 * 1000
@@ -168,13 +188,18 @@ BarWidget {
     onTriggered: root.refresh()
   }
 
-  // Minute clock to re-evaluate relative countdowns & notification alerts
+  // Minute clock to re-evaluate relative countdowns, day transitions & notification alerts
   SystemClock {
     id: minuteClock
     precision: SystemClock.Minutes
     onDateChanged: {
-      // Periodic notification check
-      if (root.currentEnableNotifications) {
+      var d = new Date()
+      var curDay = d.getDate()
+      // Midnight rollover detection
+      if (curDay !== root.lastSeenDay) {
+        root.lastSeenDay = curDay
+        root.refresh()
+      } else if (root.currentEnableNotifications) {
         Quickshell.execDetached(["python3", syncScriptPath, "notify-check"])
       }
     }

@@ -117,6 +117,7 @@ Panel {
       notificationsEnabledState = hostWidget.currentEnableNotifications
     }
     loadConfigData()
+    refresh()
     controller.show()
   }
 
