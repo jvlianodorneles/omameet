@@ -240,7 +240,7 @@ Panel {
     owner: root.barIdentity
     bar: root.bar
     open: root.opened
-    contentWidth: root.inSettingsView ? Style.space(380) : Style.space(295)
+    contentWidth: root.inSettingsView ? Style.space(380) : Style.space(305)
     contentHeight: root.inSettingsView ? (settingsColumn.implicitHeight + Style.space(24)) : (contentColumn.implicitHeight + Style.space(24))
 
     PanelKeyCatcher {
@@ -701,9 +701,9 @@ Panel {
         }
       }
 
-      // ==========================================
-      // --- MEETINGBAR CLASSIC MENU LIST VIEW ---
-      // ==========================================
+      // =========================================================================
+      // --- OPTIMIZED AGENDA VIEW (CHRONOLOGICAL + HERO FOCUS + COMPACT FOOTER) ---
+      // =========================================================================
       Column {
         id: contentColumn
         visible: !root.inSettingsView
@@ -711,16 +711,82 @@ Panel {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
         anchors.topMargin: Style.space(8)
-        spacing: Style.space(2)
+        spacing: Style.space(4)
 
-        // 1. Header: Today (Fri, 12 Feb):
+        // 1. LIVE / IMMINENT MEETING HERO FOCUS CARD
+        Rectangle {
+          id: heroCard
+          visible: root.nextMeeting && (root.nextMeeting.status === "ongoing" || root.nextMeeting.status === "soon")
+          width: parent.width
+          height: Style.space(48)
+          radius: Style.space(6)
+          color: root.nextMeeting && root.nextMeeting.status === "ongoing" ? Qt.rgba(0.9, 0.2, 0.2, 0.16) : Qt.rgba(0.2, 0.5, 0.9, 0.16)
+          border.color: root.nextMeeting && root.nextMeeting.status === "ongoing" ? Color.urgent : Color.accent
+          border.width: 1
+
+          RowLayout {
+            anchors.fill: parent
+            anchors.margins: Style.space(6)
+            spacing: Style.space(8)
+
+            ColumnLayout {
+              Layout.fillWidth: true
+              spacing: Style.space(1)
+
+              RowLayout {
+                spacing: Style.space(4)
+                Text {
+                  text: root.nextMeeting && root.nextMeeting.status === "ongoing" ? "🔴 HAPPENING NOW" : "⏳ UPCOMING SOON"
+                  color: root.nextMeeting && root.nextMeeting.status === "ongoing" ? Color.urgent : Color.accent
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption * 0.85
+                  font.bold: true
+                }
+              }
+
+              Text {
+                Layout.fillWidth: true
+                text: root.nextMeeting ? (root.nextMeeting.summary + " (" + root.nextMeeting.start + " - " + root.nextMeeting.end + ")") : ""
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body * 0.92
+                font.bold: true
+                elide: Text.ElideRight
+              }
+            }
+
+            // Quick Copy Link Button
+            Button {
+              visible: root.nextMeeting && root.nextMeeting.videoUrl
+              implicitWidth: Style.space(26)
+              implicitHeight: Style.space(26)
+              iconText: "󰆏"
+              tooltipText: "Copy meeting link"
+              onClicked: if (root.nextMeeting) root.copyMeetingLink(root.nextMeeting.videoUrl)
+            }
+
+            // Join Now Button
+            Button {
+              implicitWidth: Style.space(70)
+              implicitHeight: Style.space(26)
+              text: "Join"
+              iconText: "󰐊"
+              accent: root.nextMeeting && root.nextMeeting.status === "ongoing" ? Color.urgent : Color.accent
+              foreground: "#FFFFFF"
+              tooltipText: "Join meeting now"
+              onClicked: root.joinNextMeeting()
+            }
+          }
+        }
+
+        // 2. TIMELINE: Today Section Header
         Item {
           width: parent.width
-          height: Style.space(22)
+          height: Style.space(20)
 
           Text {
             anchors.left: parent.left
-            anchors.leftMargin: Style.space(6)
+            anchors.leftMargin: Style.space(4)
             anchors.verticalCenter: parent.verticalCenter
             text: root.todayHeader
             color: Color.muted
@@ -734,13 +800,13 @@ Panel {
         Item {
           visible: root.todayEvents.length === 0
           width: parent.width
-          height: Style.space(26)
+          height: Style.space(24)
 
           Text {
             anchors.left: parent.left
-            anchors.leftMargin: Style.space(14)
+            anchors.leftMargin: Style.space(12)
             anchors.verticalCenter: parent.verticalCenter
-            text: "No events scheduled"
+            text: "No events scheduled for today"
             color: Color.muted
             font.family: root.fontFamily
             font.pixelSize: Style.font.body * 0.95
@@ -748,7 +814,7 @@ Panel {
           }
         }
 
-        // 2. Events List (Today)
+        // Today Events List
         Repeater {
           model: root.todayEvents
 
@@ -759,7 +825,6 @@ Panel {
             height: Style.space(26)
             radius: Style.space(4)
 
-            // Highlighting: Current/Next active meeting gets blue accent highlight
             readonly property bool isSelectedMeeting: root.nextMeeting && root.nextMeeting.id === modelData.id
             readonly property bool isPast: modelData.status === "past"
             property bool isHovered: mouseRow.containsMouse
@@ -817,21 +882,19 @@ Panel {
                 opacity: eventRow.isPast ? 0.5 : 1.0
               }
 
-              // Copy Meeting Link Quick Button (appears on row hover / active)
+              // Copy Link Quick Button (on hover or selected)
               Button {
                 visible: modelData.hasLink && (eventRow.isHovered || eventRow.isSelectedMeeting)
                 implicitWidth: Style.space(20)
                 implicitHeight: Style.space(20)
                 iconText: "󰆏"
-                tooltipText: "Copy meeting link to clipboard"
+                tooltipText: "Copy meeting link"
                 accent: eventRow.isSelectedMeeting ? "#FFFFFF" : Color.accent
                 foreground: eventRow.isSelectedMeeting ? "#FFFFFF" : root.foreground
-                onClicked: {
-                  root.copyMeetingLink(modelData.videoUrl)
-                }
+                onClicked: root.copyMeetingLink(modelData.videoUrl)
               }
 
-              // Meeting Video Provider Icon
+              // Provider Icon
               Text {
                 visible: modelData.hasLink
                 text: {
@@ -847,172 +910,7 @@ Panel {
           }
         }
 
-        // 3. Action Items (Join, Create)
-        Item { width: parent.width; height: Style.space(4) }
-        Rectangle {
-          width: parent.width
-          height: 1
-          color: Color.popups.border
-        }
-        Item { width: parent.width; height: Style.space(4) }
-
-        Rectangle {
-          width: parent.width
-          height: Style.space(26)
-          radius: Style.space(4)
-          property bool isHovered: mouseJoin.containsMouse
-          color: isHovered ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
-
-          MouseArea {
-            id: mouseJoin
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: root.joinNextMeeting()
-          }
-
-          RowLayout {
-            anchors.fill: parent
-            anchors.leftMargin: Style.space(6)
-            anchors.rightMargin: Style.space(6)
-
-            Text {
-              Layout.fillWidth: true
-              text: "Join next event meeting"
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body * 0.95
-            }
-
-            Text {
-              text: "󰐊"
-              color: Color.muted
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-            }
-          }
-        }
-
-        Rectangle {
-          width: parent.width
-          height: Style.space(26)
-          radius: Style.space(4)
-          property bool isHovered: mouseCreate.containsMouse
-          color: isHovered ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
-
-          MouseArea {
-            id: mouseCreate
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: root.createInstantMeeting("google")
-          }
-
-          RowLayout {
-            anchors.fill: parent
-            anchors.leftMargin: Style.space(6)
-            anchors.rightMargin: Style.space(6)
-
-            Text {
-              Layout.fillWidth: true
-              text: "Create instant meeting (Meet)"
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body * 0.95
-            }
-
-            Text {
-              text: "󰄚"
-              color: "#00AC47"
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-            }
-          }
-        }
-
-        // 4. Bookmarks Section (MeetingBar style)
-        Item {
-          visible: root.bookmarksList.length > 0
-          width: parent.width
-          height: Style.space(4)
-        }
-        Rectangle {
-          visible: root.bookmarksList.length > 0
-          width: parent.width
-          height: 1
-          color: Color.popups.border
-        }
-        Item {
-          visible: root.bookmarksList.length > 0
-          width: parent.width
-          height: Style.space(20)
-
-          Text {
-            anchors.left: parent.left
-            anchors.leftMargin: Style.space(6)
-            anchors.verticalCenter: parent.verticalCenter
-            text: "Bookmarks"
-            color: Color.muted
-            font.family: root.fontFamily
-            font.pixelSize: Style.font.caption
-            font.bold: true
-          }
-        }
-
-        Repeater {
-          model: root.bookmarksList
-
-          Rectangle {
-            required property var modelData
-            width: parent.width
-            height: Style.space(24)
-            radius: Style.space(4)
-            property bool isHovered: mouseBm.containsMouse
-            color: isHovered ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
-
-            MouseArea {
-              id: mouseBm
-              anchors.fill: parent
-              hoverEnabled: true
-              cursorShape: Qt.PointingHandCursor
-              onClicked: root.joinMeeting(modelData.url)
-            }
-
-            RowLayout {
-              anchors.fill: parent
-              anchors.leftMargin: Style.space(6)
-              anchors.rightMargin: Style.space(6)
-
-              Text {
-                Layout.fillWidth: true
-                text: modelData.name || "Room"
-                color: root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.body * 0.95
-                elide: Text.ElideRight
-              }
-
-              // Copy bookmark link button
-              Button {
-                visible: mouseBm.containsMouse
-                implicitWidth: Style.space(18)
-                implicitHeight: Style.space(18)
-                iconText: "󰆏"
-                tooltipText: "Copy room link"
-                onClicked: root.copyMeetingLink(modelData.url)
-              }
-
-              Text {
-                text: "󰌹"
-                color: Color.muted
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.caption
-              }
-            }
-          }
-        }
-
-        // 5. Tomorrow Section (if any)
+        // 3. TIMELINE: Tomorrow Section (Chronological continuity)
         Item {
           visible: root.tomorrowEvents.length > 0
           width: parent.width
@@ -1031,7 +929,7 @@ Panel {
 
           Text {
             anchors.left: parent.left
-            anchors.leftMargin: Style.space(6)
+            anchors.leftMargin: Style.space(4)
             anchors.verticalCenter: parent.verticalCenter
             text: root.tomorrowHeader
             color: Color.muted
@@ -1070,7 +968,6 @@ Panel {
               anchors.rightMargin: Style.space(6)
               spacing: Style.space(6)
 
-              // Calendar Color Indicator Pill
               Rectangle {
                 width: Style.space(3)
                 height: Style.space(12)
@@ -1120,32 +1017,117 @@ Panel {
           }
         }
 
-        // 6. Separator
+        // 4. BOOKMARKS SECTION
+        Item {
+          visible: root.bookmarksList.length > 0
+          width: parent.width
+          height: Style.space(4)
+        }
+        Rectangle {
+          visible: root.bookmarksList.length > 0
+          width: parent.width
+          height: 1
+          color: Color.popups.border
+        }
+        Item {
+          visible: root.bookmarksList.length > 0
+          width: parent.width
+          height: Style.space(20)
+
+          Text {
+            anchors.left: parent.left
+            anchors.leftMargin: Style.space(4)
+            anchors.verticalCenter: parent.verticalCenter
+            text: "Bookmarks"
+            color: Color.muted
+            font.family: root.fontFamily
+            font.pixelSize: Style.font.caption
+            font.bold: true
+          }
+        }
+
+        Repeater {
+          model: root.bookmarksList
+
+          Rectangle {
+            required property var modelData
+            width: parent.width
+            height: Style.space(24)
+            radius: Style.space(4)
+            property bool isHovered: mouseBm.containsMouse
+            color: isHovered ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
+
+            MouseArea {
+              id: mouseBm
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.joinMeeting(modelData.url)
+            }
+
+            RowLayout {
+              anchors.fill: parent
+              anchors.leftMargin: Style.space(6)
+              anchors.rightMargin: Style.space(6)
+              spacing: Style.space(6)
+
+              Text {
+                text: "󰌹"
+                color: Color.muted
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+              }
+
+              Text {
+                Layout.fillWidth: true
+                text: modelData.name || "Room"
+                color: root.foreground
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.body * 0.95
+                elide: Text.ElideRight
+              }
+
+              Button {
+                visible: mouseBm.containsMouse
+                implicitWidth: Style.space(18)
+                implicitHeight: Style.space(18)
+                iconText: "󰆏"
+                tooltipText: "Copy room link"
+                onClicked: root.copyMeetingLink(modelData.url)
+              }
+
+              Text {
+                text: "󰐊"
+                color: Color.muted
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption * 0.9
+              }
+            }
+          }
+        }
+
+        // 5. QUICK ACTION: Create Instant Meeting
         Item { width: parent.width; height: Style.space(4) }
         Rectangle {
           width: parent.width
           height: 1
           color: Color.popups.border
         }
-        Item { width: parent.width; height: Style.space(4) }
+        Item { width: parent.width; height: Style.space(2) }
 
-        // 7. Footer: Preferences & Sync
         Rectangle {
           width: parent.width
           height: Style.space(26)
           radius: Style.space(4)
-          property bool isHovered: mousePrefs.containsMouse
+          property bool isHovered: mouseCreate.containsMouse
           color: isHovered ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
 
           MouseArea {
-            id: mousePrefs
+            id: mouseCreate
             anchors.fill: parent
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
-            onClicked: {
-              root.inSettingsView = true
-              root.loadConfigData()
-            }
+            onClicked: root.createInstantMeeting("google")
           }
 
           RowLayout {
@@ -1154,64 +1136,80 @@ Panel {
             anchors.rightMargin: Style.space(6)
 
             Text {
-              Layout.fillWidth: true
-              text: "Preferences & Calendars..."
-              color: root.foreground
+              text: "󰐕"
+              color: Color.muted
               font.family: root.fontFamily
-              font.pixelSize: Style.font.body * 0.95
+              font.pixelSize: Style.font.caption
             }
 
             Text {
-              text: "⚙"
-              color: Color.muted
+              Layout.fillWidth: true
+              text: "Create instant meeting (Meet)"
+              color: root.foreground
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.body * 0.92
+            }
+
+            Text {
+              text: "󰄚"
+              color: "#00AC47"
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
             }
           }
         }
 
-        // Action: Sync Calendars
+        // 6. COMPACT SINGLE-ROW FOOTER TOOLBAR
+        Item { width: parent.width; height: Style.space(2) }
         Rectangle {
           width: parent.width
-          height: Style.space(26)
-          radius: Style.space(4)
-          property bool isHovered: mouseSync.containsMouse
-          color: isHovered ? Qt.rgba(1, 1, 1, 0.08) : "transparent"
-
-          MouseArea {
-            id: mouseSync
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: root.refresh()
-          }
-
-          RowLayout {
-            anchors.fill: parent
-            anchors.leftMargin: Style.space(6)
-            anchors.rightMargin: Style.space(6)
-
-            Text {
-              Layout.fillWidth: true
-              text: "Sync Calendars"
-              color: root.foreground
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.body * 0.95
-            }
-
-            Text {
-              text: ""
-              color: Color.muted
-              font.family: root.fontFamily
-              font.pixelSize: Style.font.caption
-            }
-          }
+          height: 1
+          color: Color.popups.border
         }
+        Item { width: parent.width; height: Style.space(2) }
 
-        // 8. Bottom Margin Padding
         Item {
           width: parent.width
-          height: Style.space(8)
+          height: Style.space(28)
+
+          RowLayout {
+            anchors.fill: parent
+            anchors.leftMargin: Style.space(4)
+            anchors.rightMargin: Style.space(4)
+            spacing: Style.space(6)
+
+            Text {
+              Layout.fillWidth: true
+              text: "omameet"
+              color: Color.muted
+              font.family: root.fontFamily
+              font.pixelSize: Style.font.caption * 0.88
+            }
+
+            Button {
+              implicitHeight: Style.space(24)
+              text: "Sync"
+              iconText: ""
+              tooltipText: "Sync all calendar feeds now"
+              onClicked: root.refresh()
+            }
+
+            Button {
+              implicitHeight: Style.space(24)
+              iconText: "⚙"
+              tooltipText: "Preferences & Calendars"
+              onClicked: {
+                root.inSettingsView = true
+                root.loadConfigData()
+              }
+            }
+          }
+        }
+
+        // Bottom spacing
+        Item {
+          width: parent.width
+          height: Style.space(6)
         }
       }
     }
