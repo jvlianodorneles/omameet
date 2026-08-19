@@ -190,7 +190,8 @@ Panel {
   }
 
   function loadConfigData() {
-    Quickshell.execDetached(["python3", "-c", "import json, os; print(open(os.path.expanduser('~/.local/state/omarchy/omameet/config.json')).read())"], function(output) {
+    var cmd = (syncScriptPath !== "") ? ["python3", syncScriptPath, "get-config"] : ["python3", "-c", "import json, os; os.umask(0o077); p = os.path.expanduser('~/.local/state/omarchy/omameet/config.json'); print(open(p).read() if os.path.exists(p) else '{}')"]
+    Quickshell.execDetached(cmd, function(output) {
       try {
         var parsed = JSON.parse(output)
         root.feedsList = parsed.feeds || []
@@ -302,8 +303,12 @@ Panel {
     if (hostWidget && typeof hostWidget.updateSetting === "function") {
       hostWidget.updateSetting(key, value)
     }
-    var valStr = typeof value === "number" ? String(value) : (typeof value === "string" ? ("\"" + value + "\"") : (value ? "True" : "False"))
-    Quickshell.execDetached(["python3", "-c", "import json, os; p = os.path.expanduser('~/.local/state/omarchy/omameet/config.json'); d = json.load(open(p)); d.setdefault('settings', {})['" + key + "'] = " + valStr + "; json.dump(d, open(p, 'w'), indent=2)"])
+    var valStr = typeof value === "number" ? String(value) : (typeof value === "string" ? value : (value ? "true" : "false"))
+    if (syncScriptPath !== "") {
+      Quickshell.execDetached(["python3", syncScriptPath, "set-setting", key, valStr])
+    } else {
+      Quickshell.execDetached(["python3", "-c", "import json, os, sys; os.umask(0o077); p = os.path.expanduser('~/.local/state/omarchy/omameet/config.json'); os.makedirs(os.path.dirname(p), mode=0o700, exist_ok=True); d = json.load(open(p)) if os.path.exists(p) else {}; d.setdefault('settings', {})['" + key + "'] = json.loads('" + JSON.stringify(value) + "'); fd = os.open(p + '.tmp', os.O_WRONLY|os.O_CREAT|os.O_TRUNC, 0o600); json.dump(d, open(fd, 'w'), indent=2); os.replace(p + '.tmp', p); os.chmod(p, 0o600)"])
+    }
   }
 
   KeyboardPanel {

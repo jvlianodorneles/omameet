@@ -20,10 +20,21 @@ mkdir -p "$BIN_DIR"
 ln -sf "$PLUGIN_DIR/scripts/omameet" "$CLI_TARGET"
 echo "✓ CLI command 'omameet' linked to $CLI_TARGET"
 
-# 4. Initialize initial state
+# 4. Enforce secure owner-only permissions on state directory & files (0700/0600)
+STATE_DIR="$HOME/.local/state/omarchy/omameet"
+mkdir -p -m 700 "$STATE_DIR"
+chmod 700 "$STATE_DIR" 2>/dev/null || true
+if [ -f "$STATE_DIR/config.json" ]; then
+    chmod 600 "$STATE_DIR/config.json" 2>/dev/null || true
+fi
+if [ -f "$STATE_DIR/state.json" ]; then
+    chmod 600 "$STATE_DIR/state.json" 2>/dev/null || true
+fi
+
+# 5. Initialize initial state (enforcing secure permissions)
 "$PLUGIN_DIR/scripts/omameet" sync > /dev/null 2>&1 || true
 
-# 5. Notify Omarchy Shell to discover plugin
+# 6. Notify Omarchy Shell to discover plugin
 if command -v omarchy-shell > /dev/null 2>&1; then
     echo "✓ Rescanning Omarchy Shell plugins..."
     omarchy-shell shell rescanPlugins 2>/dev/null || true

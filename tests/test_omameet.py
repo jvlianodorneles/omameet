@@ -154,6 +154,44 @@ class TestSystemIntegrations(unittest.TestCase):
             ran = False
         self.assertTrue(ran)
 
+class TestOwnerOnlyPermissions(unittest.TestCase):
+    def test_state_dir_and_files_permissions(self):
+        # 1. Ensure directory is created with 0700
+        omameet.ensure_dirs()
+        self.assertTrue(os.path.exists(omameet.STATE_DIR))
+        dir_stat = os.stat(omameet.STATE_DIR)
+        dir_mode = dir_stat.st_mode & 0o777
+        self.assertEqual(dir_mode, 0o700, f"Expected 0o700 for state directory, got {oct(dir_mode)}")
+
+        # 2. Test save_config creates 0600 file
+        cfg = omameet.load_config()
+        omameet.save_config(cfg)
+        cfg_stat = os.stat(omameet.CONFIG_PATH)
+        cfg_mode = cfg_stat.st_mode & 0o777
+        self.assertEqual(cfg_mode, 0o600, f"Expected 0o600 for config.json, got {oct(cfg_mode)}")
+
+        # 3. Test save_state creates 0600 file
+        state = omameet.load_state()
+        omameet.save_state(state)
+        state_stat = os.stat(omameet.STATE_PATH)
+        state_mode = state_stat.st_mode & 0o777
+        self.assertEqual(state_mode, 0o600, f"Expected 0o600 for state.json, got {oct(state_mode)}")
+
+    def test_permission_remediation(self):
+        # Verify that if an existing file had loose permissions (e.g. 0644), load/save remediates it to 0600
+        omameet.ensure_dirs()
+        os.chmod(omameet.CONFIG_PATH, 0o644)
+        omameet.load_config()
+        cfg_mode = os.stat(omameet.CONFIG_PATH).st_mode & 0o777
+        self.assertEqual(cfg_mode, 0o600, f"Expected remediation to 0o600, got {oct(cfg_mode)}")
+
+        os.chmod(omameet.STATE_PATH, 0o644)
+        omameet.load_state()
+        state_mode = os.stat(omameet.STATE_PATH).st_mode & 0o777
+        self.assertEqual(state_mode, 0o600, f"Expected remediation to 0o600, got {oct(state_mode)}")
+
 if __name__ == "__main__":
     unittest.main()
+
+
 

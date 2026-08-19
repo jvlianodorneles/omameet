@@ -19,6 +19,9 @@ import shutil
 from zoneinfo import ZoneInfo
 from typing import Dict, List, Any, Optional, Tuple
 
+# Enforce owner-only permissions (0700 for dirs, 0600 for files) across all operations
+os.umask(0o077)
+
 STATE_DIR = os.path.expanduser("~/.local/state/omarchy/omameet")
 CONFIG_PATH = os.path.join(STATE_DIR, "config.json")
 STATE_PATH = os.path.join(STATE_DIR, "state.json")
@@ -101,7 +104,12 @@ VIDEO_PATTERNS = [
 ]
 
 def ensure_dirs():
-    os.makedirs(STATE_DIR, exist_ok=True)
+    if not os.path.exists(STATE_DIR):
+        os.makedirs(STATE_DIR, mode=0o700, exist_ok=True)
+    try:
+        os.chmod(STATE_DIR, 0o700)
+    except Exception:
+        pass
 
 def get_local_tz() -> datetime.tzinfo:
     """Detects local machine timezone robustly without throwing ZoneInfo errors."""
@@ -132,6 +140,10 @@ def load_config() -> Dict[str, Any]:
         save_config(DEFAULT_CONFIG)
         return DEFAULT_CONFIG
     try:
+        try:
+            os.chmod(CONFIG_PATH, 0o600)
+        except Exception:
+            pass
         with open(CONFIG_PATH, "r", encoding="utf-8") as f:
             cfg = json.load(f)
             if "settings" not in cfg:
@@ -152,14 +164,28 @@ def load_config() -> Dict[str, Any]:
 def save_config(cfg: Dict[str, Any]):
     ensure_dirs()
     temp_path = CONFIG_PATH + ".tmp"
-    with open(temp_path, "w", encoding="utf-8") as f:
+    fd = os.open(temp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with open(fd, "w", encoding="utf-8") as f:
         json.dump(cfg, f, indent=2, ensure_ascii=False)
+    try:
+        os.chmod(temp_path, 0o600)
+    except Exception:
+        pass
     os.replace(temp_path, CONFIG_PATH)
+    try:
+        os.chmod(CONFIG_PATH, 0o600)
+    except Exception:
+        pass
 
 def load_state() -> Dict[str, Any]:
+    ensure_dirs()
     if not os.path.exists(STATE_PATH):
         return {"version": 1, "nextMeeting": None, "todayEvents": [], "tomorrowEvents": [], "lastSyncedAt": 0, "feedsCount": 0, "bookmarks": []}
     try:
+        try:
+            os.chmod(STATE_PATH, 0o600)
+        except Exception:
+            pass
         with open(STATE_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
@@ -169,9 +195,18 @@ def load_state() -> Dict[str, Any]:
 def save_state(state: Dict[str, Any]):
     ensure_dirs()
     temp_path = STATE_PATH + ".tmp"
-    with open(temp_path, "w", encoding="utf-8") as f:
+    fd = os.open(temp_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with open(fd, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2, ensure_ascii=False)
+    try:
+        os.chmod(temp_path, 0o600)
+    except Exception:
+        pass
     os.replace(temp_path, STATE_PATH)
+    try:
+        os.chmod(STATE_PATH, 0o600)
+    except Exception:
+        pass
 
 # --- Media & System Integration ---
 
@@ -1097,6 +1132,34 @@ def main():
                 print(f"  • [{b.get('id')}] \033[1m{b.get('name')}\033[0m: {b.get('url')}")
             print()
 
+    elif cmd in ("get-config", "config"):
+        cfg = load_config()
+        print(json.dumps(cfg, indent=2, ensure_ascii=False))
+
+    elif cmd in ("set-setting", "update-setting"):
+        if len(sys.argv) < 4:
+            print("Usage: omameet set-setting <key> <value>", file=sys.stderr)
+            sys.exit(1)
+        key = sys.argv[2]
+        val_raw = sys.argv[3]
+        if val_raw.lower() in ("true", "1", "yes"):
+            val = True
+        elif val_raw.lower() in ("false", "0", "no"):
+            val = False
+        elif val_raw.isdigit():
+            val = int(val_raw)
+        else:
+            try:
+                val = float(val_raw)
+            except ValueError:
+                val = val_raw
+        cfg = load_config()
+        if "settings" not in cfg:
+            cfg["settings"] = {}
+        cfg["settings"][key] = val
+        save_config(cfg)
+        print(f"[omameet] Setting '{key}' updated to {val}")
+
     elif cmd in ("help", "h"):
         print("""
 omameet - Universal MeetingBar for Omarchy Quattro
@@ -1118,6 +1181,8 @@ Commands:
   remove-bookmark <id>       Remove a bookmarked room
   list-bookmarks [--json]    List all saved bookmarks
   notify-check               Check upcoming meetings and trigger desktop reminder
+  get-config                 Output configured settings in JSON
+  set-setting <key> <value>  Update a specific plugin setting
 """)
 
     else:
@@ -1126,3 +1191,4 @@ Commands:
 
 if __name__ == "__main__":
     main()
+
