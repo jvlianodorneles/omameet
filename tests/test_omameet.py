@@ -190,6 +190,83 @@ class TestOwnerOnlyPermissions(unittest.TestCase):
         state_mode = os.stat(omameet.STATE_PATH).st_mode & 0o777
         self.assertEqual(state_mode, 0o600, f"Expected remediation to 0o600, got {oct(state_mode)}")
 
+class TestRedirectSecurity(unittest.TestCase):
+    def setUp(self):
+        self.handler = omameet.SafeRedirectHandler()
+
+    def test_cross_origin_redirect_strips_auth(self):
+        req = omameet.urllib.request.Request(
+            "https://calendar.company.com/feed.ics",
+            headers={"Authorization": "Basic dXNlcjpwYXNz"}
+        )
+        new_req = self.handler.redirect_request(req, None, 302, "Found", {}, "https://evil.com/feed.ics")
+        self.assertIsNotNone(new_req)
+        self.assertNotIn("Authorization", new_req.headers)
+        self.assertNotIn("authorization", [k.lower() for k in new_req.headers.keys()])
+        self.assertNotIn("authorization", [k.lower() for k in new_req.unredirected_hdrs.keys()])
+
+    def test_https_to_http_downgrade_strips_auth(self):
+        req = omameet.urllib.request.Request(
+            "https://calendar.company.com/feed.ics",
+            headers={"Authorization": "Basic dXNlcjpwYXNz"}
+        )
+        new_req = self.handler.redirect_request(req, None, 302, "Found", {}, "http://calendar.company.com/feed.ics")
+        self.assertIsNotNone(new_req)
+        self.assertNotIn("Authorization", new_req.headers)
+        self.assertNotIn("authorization", [k.lower() for k in new_req.headers.keys()])
+
+    def test_cross_port_redirect_strips_auth(self):
+        req = omameet.urllib.request.Request(
+            "https://calendar.company.com:8443/feed.ics",
+            headers={"Authorization": "Basic dXNlcjpwYXNz"}
+        )
+        new_req = self.handler.redirect_request(req, None, 302, "Found", {}, "https://calendar.company.com:9443/feed.ics")
+        self.assertIsNotNone(new_req)
+        self.assertNotIn("Authorization", new_req.headers)
+
+    def test_same_origin_redirect_preserves_auth(self):
+        req = omameet.urllib.request.Request(
+            "https://calendar.company.com/v1/feed.ics",
+            headers={"Authorization": "Basic dXNlcjpwYXNz"}
+        )
+        new_req = self.handler.redirect_request(req, None, 302, "Found", {}, "https://calendar.company.com/v2/feed.ics")
+        self.assertIsNotNone(new_req)
+        self.assertIn("Authorization", new_req.headers)
+        self.assertEqual(new_req.headers["Authorization"], "Basic dXNlcjpwYXNz")
+
+    def test_same_origin_relative_redirect_preserves_auth(self):
+        req = omameet.urllib.request.Request(
+            "https://calendar.company.com/v1/feed.ics",
+            headers={"Authorization": "Basic dXNlcjpwYXNz"}
+        )
+        new_req = self.handler.redirect_request(req, None, 302, "Found", {}, "/v2/feed.ics")
+        self.assertIsNotNone(new_req)
+        self.assertIn("Authorization", new_req.headers)
+        self.assertEqual(new_req.headers["Authorization"], "Basic dXNlcjpwYXNz")
+
+class TestQmlPlainTextRendering(unittest.TestCase):
+    def test_all_text_elements_in_qml_enforce_plain_text(self):
+        import re
+        plugin_dir = os.path.expanduser("~/.config/omarchy/plugins/dorneles.omameet")
+        qml_files = ["BarWidget.qml", "Panel.qml"]
+
+        for fname in qml_files:
+            fpath = os.path.join(plugin_dir, fname)
+            self.assertTrue(os.path.exists(fpath), f"File {fpath} not found")
+            with open(fpath, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            text_indices = [m.start() for m in re.finditer(r"\bText\s*\{", content)]
+            self.assertGreater(len(text_indices), 0, f"No Text elements found in {fname}")
+
+            for pos in text_indices:
+                snippet = content[pos:pos+250]
+                self.assertIn(
+                    "textFormat: Text.PlainText",
+                    snippet,
+                    f"Text element in {fname} missing textFormat: Text.PlainText near:\n{snippet[:100]}..."
+                )
+
 if __name__ == "__main__":
     unittest.main()
 

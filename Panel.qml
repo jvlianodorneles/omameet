@@ -352,6 +352,7 @@ Panel {
 
           Text {
             text: "Preferences & Calendars"
+            textFormat: Text.PlainText
             color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.body
@@ -382,6 +383,7 @@ Panel {
           Text {
             anchors.verticalCenter: parent.verticalCenter
             text: "STATUS BAR & POSITION"
+            textFormat: Text.PlainText
             color: Color.muted
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption * 0.85
@@ -401,6 +403,7 @@ Panel {
             Text {
               Layout.fillWidth: true
               text: "Max Title Length (" + root.maxTitleLengthState + " chars)"
+              textFormat: Text.PlainText
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.body * 0.95
@@ -448,6 +451,7 @@ Panel {
 
           Text {
             text: "Display Format"
+            textFormat: Text.PlainText
             color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.body * 0.95
@@ -534,6 +538,7 @@ Panel {
 
           Text {
             text: "Bar Position"
+            textFormat: Text.PlainText
             color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.body * 0.95
@@ -585,6 +590,7 @@ Panel {
 
           Text {
             text: "Instant Meeting App"
+            textFormat: Text.PlainText
             color: root.foreground
             font.family: root.fontFamily
             font.pixelSize: Style.font.body * 0.95
@@ -658,6 +664,7 @@ Panel {
             Text {
               Layout.fillWidth: true
               text: "Marquee text animation"
+              textFormat: Text.PlainText
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.body * 0.95
@@ -688,6 +695,7 @@ Panel {
             Text {
               Layout.fillWidth: true
               text: "Pause music on call join"
+              textFormat: Text.PlainText
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.body * 0.95
@@ -718,6 +726,7 @@ Panel {
             Text {
               Layout.fillWidth: true
               text: "Mute microphone on call join"
+              textFormat: Text.PlainText
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.body * 0.95
@@ -748,6 +757,7 @@ Panel {
             Text {
               Layout.fillWidth: true
               text: "Desktop meeting reminders"
+              textFormat: Text.PlainText
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.body * 0.95
@@ -778,6 +788,7 @@ Panel {
             Text {
               Layout.fillWidth: true
               text: "Hide declined calendar events"
+              textFormat: Text.PlainText
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.body * 0.95
@@ -803,6 +814,7 @@ Panel {
           Text {
             anchors.verticalCenter: parent.verticalCenter
             text: "CONNECTED CALENDARS (" + root.feedsList.length + ")"
+            textFormat: Text.PlainText
             color: Color.muted
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption * 0.85
@@ -832,6 +844,7 @@ Panel {
               Text {
                 Layout.fillWidth: true
                 text: modelData.name || "Calendar"
+                textFormat: Text.PlainText
                 color: root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body * 0.95
@@ -893,6 +906,7 @@ Panel {
           Text {
             anchors.verticalCenter: parent.verticalCenter
             text: "BOOKMARKS (" + root.bookmarksList.length + ")"
+            textFormat: Text.PlainText
             color: Color.muted
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption * 0.85
@@ -914,6 +928,7 @@ Panel {
 
               Text {
                 text: "󰌹"
+                textFormat: Text.PlainText
                 color: Color.muted
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
@@ -922,6 +937,7 @@ Panel {
               Text {
                 Layout.fillWidth: true
                 text: modelData.name || "Room"
+                textFormat: Text.PlainText
                 color: root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body * 0.95
@@ -988,6 +1004,7 @@ Panel {
             Text {
               Layout.alignment: Qt.AlignHCenter
               text: "omameet"
+              textFormat: Text.PlainText
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.body * 0.95
@@ -1018,6 +1035,7 @@ Panel {
 
                 Text {
                   text: ""
+                  textFormat: Text.PlainText
                   color: Color.accent
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.caption
@@ -1025,6 +1043,7 @@ Panel {
 
                 Text {
                   text: "github.com/jvlianodorneles/omameet"
+                  textFormat: Text.PlainText
                   color: gitMouse.containsMouse ? Color.accent : Color.muted
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.caption
@@ -1080,6 +1099,7 @@ Panel {
                 spacing: Style.space(4)
                 Text {
                   text: root.nextMeeting && root.nextMeeting.status === "ongoing" ? "🔴 HAPPENING NOW" : "⏳ UPCOMING SOON"
+                  textFormat: Text.PlainText
                   color: root.nextMeeting && root.nextMeeting.status === "ongoing" ? Color.urgent : Color.accent
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.caption * 0.85
@@ -1090,6 +1110,7 @@ Panel {
               Text {
                 Layout.fillWidth: true
                 text: root.nextMeeting ? (root.nextMeeting.summary + " (" + root.nextMeeting.start + " - " + root.nextMeeting.end + ")") : ""
+                textFormat: Text.PlainText
                 color: root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body * 0.95
@@ -1138,6 +1159,7 @@ Panel {
             anchors.leftMargin: Style.space(4)
             anchors.verticalCenter: parent.verticalCenter
             text: root.todayHeader
+            textFormat: Text.PlainText
             color: Color.muted
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -1156,6 +1178,7 @@ Panel {
             anchors.leftMargin: Style.space(12)
             anchors.verticalCenter: parent.verticalCenter
             text: "No events scheduled for today"
+            textFormat: Text.PlainText
             color: Color.muted
             font.family: root.fontFamily
             font.pixelSize: Style.font.body * 0.95
@@ -1211,6 +1234,7 @@ Panel {
               // Start Time
               Text {
                 text: modelData.isAllDay ? "All Day" : modelData.start
+                textFormat: Text.PlainText
                 color: eventRow.isSelectedMeeting ? "#FFFFFF" : (eventRow.isPast ? Color.muted : root.foreground)
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body * 0.95
@@ -1223,6 +1247,7 @@ Panel {
               Text {
                 Layout.fillWidth: true
                 text: modelData.summary
+                textFormat: Text.PlainText
                 color: eventRow.isSelectedMeeting ? "#FFFFFF" : (eventRow.isPast ? Color.muted : root.foreground)
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body * 0.95
@@ -1250,6 +1275,7 @@ Panel {
                   var meta = Model.getProviderMeta(modelData.providerId)
                   return meta.icon
                 }
+                textFormat: Text.PlainText
                 color: eventRow.isSelectedMeeting ? "#FFFFFF" : Color.accent
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
@@ -1281,6 +1307,7 @@ Panel {
             anchors.leftMargin: Style.space(4)
             anchors.verticalCenter: parent.verticalCenter
             text: root.tomorrowHeader
+            textFormat: Text.PlainText
             color: Color.muted
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -1328,6 +1355,7 @@ Panel {
 
               Text {
                 text: modelData.isAllDay ? "All Day" : modelData.start
+                textFormat: Text.PlainText
                 color: Color.muted
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
@@ -1337,6 +1365,7 @@ Panel {
               Text {
                 Layout.fillWidth: true
                 text: modelData.summary
+                textFormat: Text.PlainText
                 color: root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body * 0.95
@@ -1358,6 +1387,7 @@ Panel {
                   var meta = Model.getProviderMeta(modelData.providerId)
                   return meta.icon
                 }
+                textFormat: Text.PlainText
                 color: Color.muted
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
@@ -1388,6 +1418,7 @@ Panel {
             anchors.leftMargin: Style.space(4)
             anchors.verticalCenter: parent.verticalCenter
             text: "Bookmarks"
+            textFormat: Text.PlainText
             color: Color.muted
             font.family: root.fontFamily
             font.pixelSize: Style.font.caption
@@ -1422,6 +1453,7 @@ Panel {
 
               Text {
                 text: "󰌹"
+                textFormat: Text.PlainText
                 color: Color.muted
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
@@ -1430,6 +1462,7 @@ Panel {
               Text {
                 Layout.fillWidth: true
                 text: modelData.name || "Room"
+                textFormat: Text.PlainText
                 color: root.foreground
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.body * 0.95
@@ -1447,6 +1480,7 @@ Panel {
 
               Text {
                 text: "󰐊"
+                textFormat: Text.PlainText
                 color: Color.muted
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption * 0.9
@@ -1486,6 +1520,7 @@ Panel {
 
             Text {
               text: "󰐕"
+              textFormat: Text.PlainText
               color: Color.muted
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption
@@ -1494,6 +1529,7 @@ Panel {
             Text {
               Layout.fillWidth: true
               text: "Create instant meeting (" + root.instantProviderMeta.name + ")"
+              textFormat: Text.PlainText
               color: root.foreground
               font.family: root.fontFamily
               font.pixelSize: Style.font.body * 0.92
@@ -1501,6 +1537,7 @@ Panel {
 
             Text {
               text: root.instantProviderMeta.icon
+              textFormat: Text.PlainText
               color: root.instantProviderMeta.color
               font.family: root.fontFamily
               font.pixelSize: Style.font.caption

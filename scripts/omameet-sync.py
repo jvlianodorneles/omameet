@@ -16,6 +16,7 @@ import ssl
 import subprocess
 import datetime
 import shutil
+import base64
 from zoneinfo import ZoneInfo
 from typing import Dict, List, Any, Optional, Tuple
 
@@ -615,6 +616,44 @@ def parse_ics_content(ics_text: str, feed_meta: Dict[str, Any], window_start: da
 
 # --- Feed Fetcher ---
 
+class SafeRedirectHandler(urllib.request.HTTPRedirectHandler):
+    """
+    Redirect handler that prevents Authorization credentials from leaking
+    across cross-origin redirects or HTTPS-to-HTTP downgrades.
+    """
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        target_url = urllib.parse.urljoin(req.full_url, newurl.replace(' ', '%20'))
+        new_req = super().redirect_request(req, fp, code, msg, headers, target_url)
+        if new_req is None:
+            return None
+
+        orig_parsed = urllib.parse.urlsplit(req.full_url)
+        new_parsed = urllib.parse.urlsplit(target_url)
+
+        orig_scheme = orig_parsed.scheme.lower()
+        new_scheme = new_parsed.scheme.lower()
+
+        # Check for HTTPS to HTTP downgrade
+        is_downgrade = (orig_scheme == "https" and new_scheme == "http")
+
+        orig_port = orig_parsed.port or (443 if orig_scheme == "https" else 80 if orig_scheme == "http" else None)
+        new_port = new_parsed.port or (443 if new_scheme == "https" else 80 if new_scheme == "http" else None)
+
+        orig_host = (orig_parsed.hostname or "").lower()
+        new_host = (new_parsed.hostname or "").lower()
+
+        is_cross_origin = (orig_scheme != new_scheme or orig_host != new_host or orig_port != new_port)
+
+        if is_cross_origin or is_downgrade:
+            for k in list(new_req.headers.keys()):
+                if k.lower() == "authorization":
+                    del new_req.headers[k]
+            for k in list(new_req.unredirected_hdrs.keys()):
+                if k.lower() == "authorization":
+                    del new_req.unredirected_hdrs[k]
+
+        return new_req
+
 def fetch_feed_content(feed: Dict[str, Any]) -> str:
     url = feed.get("url", "").strip()
     if not url:
@@ -656,7 +695,6 @@ def fetch_feed_content(feed: Dict[str, Any]) -> str:
     username = feed.get("username")
     password = feed.get("password")
     if username and password:
-        import base64
         auth_header = "Basic " + base64.b64encode(f"{username}:{password}".encode()).decode()
         req.add_header("Authorization", auth_header)
 
@@ -665,7 +703,9 @@ def fetch_feed_content(feed: Dict[str, Any]) -> str:
         ctx.check_hostname = False
         ctx.verify_mode = ssl.CERT_NONE
 
-    with urllib.request.urlopen(req, timeout=15, context=ctx) as response:
+    https_handler = urllib.request.HTTPSHandler(context=ctx)
+    opener = urllib.request.build_opener(SafeRedirectHandler(), https_handler)
+    with opener.open(req, timeout=15) as response:
         return response.read().decode("utf-8", errors="ignore")
 
 # --- Sync & State Builder ---

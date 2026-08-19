@@ -282,6 +282,7 @@ BarWidget {
         Text {
           text: root.barData.icon
           visible: root.barData.icon !== ""
+          textFormat: Text.PlainText
           color: root.barData.isLive ? Color.urgent : (root.barData.isSoon ? Color.warning : button.foreground)
           font.family: button.fontFamily
           font.pixelSize: button.fontSize
@@ -297,6 +298,7 @@ BarWidget {
           Text {
             id: marqueeText
             text: (root.barData.isLive ? "🔴 " : "") + root.barData.rawTitle + (root.barData.countdown ? (" " + root.barData.countdown) : "")
+            textFormat: Text.PlainText
             color: root.barData.isLive ? Color.urgent : (root.barData.isSoon ? Color.warning : button.foreground)
             font.family: button.fontFamily
             font.pixelSize: button.fontSize
