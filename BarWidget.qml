@@ -249,11 +249,7 @@ BarWidget {
     hasVisualContent: true
     horizontalMargin: 8.5
     verticalPadding: 6
-    tooltipText: "omameet • " + (root.nextMeeting ? (root.nextMeeting.summary + " (" + root.nextMeeting.start + " - " + root.nextMeeting.end + ")") : "No upcoming meetings") +
-                 "\n──────────────────────────" +
-                 "\n• Left-click: Open Agenda" +
-                 "\n• Middle-click: Join Meeting (1-Click Join)" +
-                 "\n• Scroll wheel: Cycle format (" + root.currentFormat + ")"
+    tooltipText: Model.buildTooltip(root.nextMeeting, root.currentFormat)
 
     onPressed: function(b) {
       if (b === Qt.MiddleButton) {

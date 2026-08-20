@@ -17,6 +17,7 @@ import subprocess
 import datetime
 import shutil
 import base64
+import html
 from zoneinfo import ZoneInfo
 from typing import Dict, List, Any, Optional, Tuple
 
@@ -97,20 +98,26 @@ def strip_control_chars(text: Any, multiline: bool = False) -> str:
     return "".join(res)
 
 def strip_html(text: Any) -> str:
-    """Strips HTML markup, scripts, and decodes common HTML entities to prevent rich text interpretation."""
+    """
+    Decodes entity-encoded HTML markup first, strips script/style blocks and tags,
+    and removes any stray angle brackets so no HTML/markup can ever form.
+    """
     if not text:
         return ""
-    cleaned = SCRIPT_STYLE_RE.sub("", str(text))
-    cleaned = HTML_TAG_RE.sub("", cleaned)
-    cleaned = (
-        cleaned.replace("&amp;", "&")
-        .replace("&lt;", "<")
-        .replace("&gt;", ">")
-        .replace("&quot;", '"')
-        .replace("&#39;", "'")
-        .replace("&nbsp;", " ")
-    )
-    return cleaned
+    s = str(text)
+    # Iteratively unescape HTML entities to unpack any nested entity encodings (e.g. &amp;lt;img...)
+    for _ in range(5):
+        unescaped = html.unescape(s)
+        if unescaped == s:
+            break
+        s = unescaped
+    # Strip script/style blocks and their contents
+    s = SCRIPT_STYLE_RE.sub("", s)
+    # Strip all HTML tags
+    s = HTML_TAG_RE.sub("", s)
+    # Strip any remaining angle brackets to strictly prevent tag creation / rich text parsing
+    s = s.replace("<", "").replace(">", "")
+    return s
 
 def sanitize_text(text: Any, multiline: bool = False, max_len: Optional[int] = 2000) -> str:
     """Sanitizes parsed calendar and feed fields (strips ANSI, HTML tags, control chars, normalizes spaces)."""

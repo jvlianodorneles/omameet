@@ -158,6 +158,38 @@ function formatCountdown(minutesToStart, minutesRemaining, status) {
 }
 
 /**
+ * Strips HTML tags, angle brackets, and non-printable control characters to guarantee PlainText safety.
+ */
+function sanitizePlainText(text) {
+  if (!text) return "";
+  var s = String(text);
+  s = s.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, "");
+  s = s.replace(/<[^>]+>/g, "");
+  s = s.replace(/[<>]/g, "");
+  s = s.replace(/[\x00-\x1f\x7f-\x9f]/g, " ");
+  return s.trim();
+}
+
+/**
+ * Builds safe plain-text tooltip avoiding any markup rendering in host tooltips.
+ */
+function buildTooltip(nextMeeting, currentFormat) {
+  var meetingInfo = "No upcoming meetings";
+  if (nextMeeting) {
+    var title = sanitizePlainText(nextMeeting.summary || "Meeting");
+    var startTime = sanitizePlainText(nextMeeting.start || "");
+    var endTime = sanitizePlainText(nextMeeting.end || "");
+    var timeInfo = (startTime && endTime) ? (" (" + startTime + " - " + endTime + ")") : "";
+    meetingInfo = title + timeInfo;
+  }
+  return "omameet • " + meetingInfo +
+         "\n──────────────────────────" +
+         "\n• Left-click: Open Agenda" +
+         "\n• Middle-click: Join Meeting (1-Click Join)" +
+         "\n• Scroll wheel: Cycle format (" + (currentFormat || "title_countdown") + ")";
+}
+
+/**
  * Formats the bar widget text based on format and settings.
  * Strictly guarantees that non-marquee text will NEVER exceed maxTitleLength characters.
  */
@@ -183,7 +215,7 @@ function formatBarContent(meeting, format, maxTitleLength, marqueeEnabled, showI
 
   var meta = getProviderMeta(meeting.providerId);
   var icon = showIcon ? meta.icon : "";
-  var rawTitle = (meeting.summary || "Meeting").trim();
+  var rawTitle = sanitizePlainText(meeting.summary || "Meeting");
   var timeStr = meeting.isAllDay ? "All Day" : (meeting.start || "");
   var countdownStr = showCountdown ? formatCountdown(meeting.minutesToStart, meeting.minutesRemaining, meeting.status) : "";
   var isLive = meeting.status === "ongoing";

@@ -300,6 +300,15 @@ class TestQmlPlainTextRendering(unittest.TestCase):
         self.assertRegex(content, r'WidgetButton\s*\{[^}]*text:\s*""', "WidgetButton must set text: \"\" to prevent AutoText rendering")
         self.assertRegex(content, r'WidgetButton\s*\{[^}]*labelVisible:\s*false', "WidgetButton must set labelVisible: false")
 
+    def test_widget_button_tooltip_uses_safe_model_builder(self):
+        import re
+        plugin_dir = os.path.expanduser("~/.config/omarchy/plugins/dorneles.omameet")
+        bar_path = os.path.join(plugin_dir, "BarWidget.qml")
+        with open(bar_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        self.assertIn("tooltipText: Model.buildTooltip(", content, "WidgetButton tooltipText must use Model.buildTooltip to enforce PlainText")
+
 class TestTerminalAndMarkupSanitization(unittest.TestCase):
     def test_strip_ansi_removes_escape_codes(self):
         raw = "\x1b[31mRed Title\x1b[0m \x1b]52;c;Y2F0Cg==\x07Malicious"
@@ -319,8 +328,27 @@ class TestTerminalAndMarkupSanitization(unittest.TestCase):
         self.assertNotIn("<img", cleaned)
         self.assertNotIn("<b", cleaned)
 
+    def test_strip_html_entity_encoded_tags(self):
+        # Entity-encoded markup must be decoded and stripped, not left as raw decoded HTML
+        raw1 = '&lt;img src="https://evil.com/leak.png"&gt; Meeting Title'
+        cleaned1 = omameet.strip_html(raw1)
+        self.assertEqual(cleaned1, " Meeting Title")
+        self.assertNotIn("<img", cleaned1)
+        self.assertNotIn("<", cleaned1)
+        self.assertNotIn(">", cleaned1)
+
+        raw2 = '&#60;img src="https://evil.com/leak.png"&#62; Malicious'
+        cleaned2 = omameet.strip_html(raw2)
+        self.assertEqual(cleaned2, " Malicious")
+        self.assertNotIn("<img", cleaned2)
+
+        raw3 = '&amp;lt;img src="https://evil.com/leak.png"&amp;gt; Nested Entity'
+        cleaned3 = omameet.strip_html(raw3)
+        self.assertEqual(cleaned3, " Nested Entity")
+        self.assertNotIn("<img", cleaned3)
+
     def test_sanitize_text_comprehensive(self):
-        raw = "\x1b[1m<script>alert(1)</script>Team\rSync\x00 \n\n Room 1"
+        raw = "\x1b[1m&lt;script&gt;alert(1)&lt;/script&gt;Team\rSync\x00 \n\n Room 1"
         cleaned = omameet.sanitize_text(raw, multiline=False)
         self.assertEqual(cleaned, "Team Sync Room 1")
 
@@ -336,8 +364,8 @@ class TestTerminalAndMarkupSanitization(unittest.TestCase):
 VERSION:2.0
 BEGIN:VEVENT
 UID:sec_test@omameet
-SUMMARY:\x1b[31m<img src="http://evil.com">Malicious Meeting\x1b[0m\\nInjection
-DESCRIPTION:<script>alert(1)</script>Confidential \x1b[2JNotes
+SUMMARY:\x1b[31m&lt;img src="http://evil.com"&gt;Malicious Meeting\x1b[0m\\nInjection
+DESCRIPTION:&lt;script&gt;alert(1)&lt;/script&gt;Confidential \x1b[2JNotes
 LOCATION:<img src="http://tracker.com">Room A
 ORGANIZER:\x1b[33mCEO <boss@corp.com>\x1b[0m
 DTSTART:20260820T100000Z
@@ -352,10 +380,12 @@ END:VCALENDAR"""
         self.assertEqual(len(evts), 1)
         evt = evts[0]
         self.assertNotIn("<img", evt["summary"])
+        self.assertNotIn("&lt;", evt["summary"])
         self.assertNotIn("\x1b", evt["summary"])
         self.assertNotIn("\r", evt["summary"])
         self.assertEqual(evt["summary"], "Malicious Meeting Injection")
         self.assertNotIn("<script", evt["description"])
+        self.assertNotIn("&lt;script", evt["description"])
         self.assertNotIn("\x1b", evt["description"])
         self.assertNotIn("<img", evt["location"])
         self.assertNotIn("\x1b", evt["organizer"])
