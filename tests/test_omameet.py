@@ -267,6 +267,142 @@ class TestQmlPlainTextRendering(unittest.TestCase):
                     f"Text element in {fname} missing textFormat: Text.PlainText near:\n{snippet[:100]}..."
                 )
 
+    def test_widget_button_does_not_use_autotext_label(self):
+        import re
+        plugin_dir = os.path.expanduser("~/.config/omarchy/plugins/dorneles.omameet")
+        bar_path = os.path.join(plugin_dir, "BarWidget.qml")
+        with open(bar_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        # Ensure WidgetButton text is empty and labelVisible is false so AutoText is bypassed
+        self.assertRegex(content, r'WidgetButton\s*\{[^}]*text:\s*""', "WidgetButton must set text: \"\" to prevent AutoText rendering")
+        self.assertRegex(content, r'WidgetButton\s*\{[^}]*labelVisible:\s*false', "WidgetButton must set labelVisible: false")
+
+class TestTerminalAndMarkupSanitization(unittest.TestCase):
+    def test_strip_ansi_removes_escape_codes(self):
+        raw = "\x1b[31mRed Title\x1b[0m \x1b]52;c;Y2F0Cg==\x07Malicious"
+        cleaned = omameet.strip_ansi(raw)
+        self.assertEqual(cleaned, "Red Title Malicious")
+        self.assertNotIn("\x1b", cleaned)
+
+    def test_strip_control_chars_removes_c0_c1_and_cr(self):
+        raw = "Fake Line\rReal Line\x00\x07\x08"
+        cleaned = omameet.strip_control_chars(raw)
+        self.assertEqual(cleaned, "Fake Line Real Line")
+
+    def test_strip_html_removes_markup(self):
+        raw = '<img src="https://evil.com/leak.png"> Meeting <b>Title</b> &amp; Notes'
+        cleaned = omameet.strip_html(raw)
+        self.assertEqual(cleaned, " Meeting Title & Notes")
+        self.assertNotIn("<img", cleaned)
+        self.assertNotIn("<b", cleaned)
+
+    def test_sanitize_text_comprehensive(self):
+        raw = "\x1b[1m<script>alert(1)</script>Team\rSync\x00 \n\n Room 1"
+        cleaned = omameet.sanitize_text(raw, multiline=False)
+        self.assertEqual(cleaned, "Team Sync Room 1")
+
+    def test_sanitize_terminal_output(self):
+        raw = "\x1b[32m\x1b]0;hacked\x07Meeting\rOverwritten"
+        cleaned = omameet.sanitize_terminal_output(raw)
+        self.assertNotIn("\x1b", cleaned)
+        self.assertNotIn("\r", cleaned)
+        self.assertNotIn("\x07", cleaned)
+
+    def test_ics_parser_sanitizes_titles_and_fields(self):
+        ics = """BEGIN:VCALENDAR
+VERSION:2.0
+BEGIN:VEVENT
+UID:sec_test@omameet
+SUMMARY:\x1b[31m<img src="http://evil.com">Malicious Meeting\x1b[0m\\nInjection
+DESCRIPTION:<script>alert(1)</script>Confidential \x1b[2JNotes
+LOCATION:<img src="http://tracker.com">Room A
+ORGANIZER:\x1b[33mCEO <boss@corp.com>\x1b[0m
+DTSTART:20260820T100000Z
+DTEND:20260820T110000Z
+STATUS:CONFIRMED
+END:VEVENT
+END:VCALENDAR"""
+        tz = omameet.get_local_tz()
+        w_start = datetime.datetime(2026, 8, 20, 0, 0, tzinfo=datetime.timezone.utc).astimezone(tz)
+        w_end = datetime.datetime(2026, 8, 20, 23, 59, tzinfo=datetime.timezone.utc).astimezone(tz)
+        evts = omameet.parse_ics_content(ics, {"id": "sec", "name": "<img src=x>Sec"}, w_start, w_end, tz)
+        self.assertEqual(len(evts), 1)
+        evt = evts[0]
+        self.assertNotIn("<img", evt["summary"])
+        self.assertNotIn("\x1b", evt["summary"])
+        self.assertNotIn("\r", evt["summary"])
+        self.assertEqual(evt["summary"], "Malicious Meeting Injection")
+        self.assertNotIn("<script", evt["description"])
+        self.assertNotIn("\x1b", evt["description"])
+        self.assertNotIn("<img", evt["location"])
+        self.assertNotIn("\x1b", evt["organizer"])
+        self.assertNotIn("<img", evt["feed_name"])
+
+class TestBoundedFeedResponses(unittest.TestCase):
+    def test_read_bounded_stream_within_limit(self):
+        import io
+        data = b"A" * 1024
+        stream = io.BytesIO(data)
+        res = omameet.read_bounded_stream(stream, max_bytes=2048)
+        self.assertEqual(len(res), 1024)
+
+    def test_read_bounded_stream_exceeds_limit(self):
+        import io
+        data = b"A" * 2048
+        stream = io.BytesIO(data)
+        with self.assertRaises(ValueError):
+            omameet.read_bounded_stream(stream, max_bytes=1024)
+
+    def test_max_events_per_feed_limit(self):
+        tz = omameet.get_local_tz()
+        w_start = datetime.datetime(2026, 8, 20, 0, 0, tzinfo=datetime.timezone.utc).astimezone(tz)
+        w_end = datetime.datetime(2026, 8, 20, 23, 59, tzinfo=datetime.timezone.utc).astimezone(tz)
+
+        # Generate a large synthetic ICS
+        lines = ["BEGIN:VCALENDAR", "VERSION:2.0"]
+        for i in range(100):
+            lines.extend([
+                "BEGIN:VEVENT",
+                f"UID:evt_{i}",
+                f"SUMMARY:Event {i}",
+                "DTSTART:20260820T100000Z",
+                "DTEND:20260820T110000Z",
+                "STATUS:CONFIRMED",
+                "END:VEVENT"
+            ])
+        lines.append("END:VCALENDAR")
+        ics_text = "\n".join(lines)
+
+        orig_max = omameet.MAX_EVENTS_PER_FEED
+        try:
+            omameet.MAX_EVENTS_PER_FEED = 15
+            evts = omameet.parse_ics_content(ics_text, {"id": "test", "name": "Test"}, w_start, w_end, tz)
+            self.assertEqual(len(evts), 15)
+        finally:
+            omameet.MAX_EVENTS_PER_FEED = orig_max
+
+class TestUrlSafetyAndValidation(unittest.TestCase):
+    def test_safe_urls(self):
+        self.assertTrue(omameet.is_safe_url("https://meet.google.com/abc-defg-hij"))
+        self.assertTrue(omameet.is_safe_url("http://zoom.us/j/123456"))
+        self.assertTrue(omameet.is_safe_url("webcal://calendar.company.com/feed.ics"))
+        self.assertTrue(omameet.is_safe_url("zoommtg://zoom.us/join?confno=123456"))
+
+    def test_unsafe_urls(self):
+        self.assertFalse(omameet.is_safe_url("javascript:alert(1)"))
+        self.assertFalse(omameet.is_safe_url("data:text/html,<script>alert(1)</script>"))
+        self.assertFalse(omameet.is_safe_url("file:///etc/passwd"))
+        self.assertFalse(omameet.is_safe_url("--help"))
+        self.assertFalse(omameet.is_safe_url("-malicious-flag"))
+        self.assertFalse(omameet.is_safe_url(""))
+
+    def test_color_sanitization(self):
+        self.assertEqual(omameet.sanitize_color("#4285F4"), "#4285F4")
+        self.assertEqual(omameet.sanitize_color("#AABBCCDD"), "#AABBCCDD")
+        self.assertEqual(omameet.sanitize_color("invalid_color"), "#4285F4")
+        self.assertEqual(omameet.sanitize_color("#123; rm -rf /"), "#4285F4")
+
 if __name__ == "__main__":
     unittest.main()
 

@@ -118,7 +118,7 @@ BarWidget {
     if (panelLoader.item) panelLoader.item.toggle()
   }
 
-  readonly property real openPanelIndicatorWidth: button.labelWidth
+  readonly property real openPanelIndicatorWidth: root.vertical ? Style.bar.iconSlot : (root.barData.needsMarquee ? marqueeSlotWidth : (staticLabel ? staticLabel.implicitWidth : 0))
   readonly property real openPanelIndicatorHeight: Math.max(Style.space(10), Math.round(Style.bar.iconSlot * 0.55))
   readonly property bool popoutSwitchClosing: panelLoader.item ? panelLoader.item.popoutSwitchClosing === true : false
 
@@ -233,15 +233,19 @@ BarWidget {
 
   readonly property real marqueeSlotWidth: Math.min(Style.space(240), Math.max(Style.space(90), root.currentMaxTitleLength * 8.5))
 
-  implicitWidth: root.vertical ? button.implicitWidth : (root.barData.needsMarquee ? (marqueeSlotWidth + Style.space(20)) : button.implicitWidth)
+  implicitWidth: root.vertical
+    ? (button.fixedWidth > 0 ? button.fixedWidth : (root.vertical ? (root.bar ? root.bar.barSize : Style.bar.sizeHorizontal) : Math.max(12, Style.bar.iconSlot)))
+    : (root.barData.needsMarquee
+       ? (marqueeSlotWidth + Style.space(20))
+       : Math.max(12, (staticLabel ? staticLabel.implicitWidth : 0) + button.scaledHorizontalMargin * 2))
   implicitHeight: button.implicitHeight
 
   WidgetButton {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: (root.vertical || root.barData.needsMarquee) ? "" : root.barData.fullText
-    labelVisible: !root.vertical && !root.barData.needsMarquee
+    text: ""
+    labelVisible: false
     hasVisualContent: true
     horizontalMargin: 8.5
     verticalPadding: 6
@@ -263,6 +267,21 @@ BarWidget {
 
     onWheelMoved: function(delta) {
       root.cycleFormat()
+    }
+
+    // --- Custom Static Container (Horizontal Bar, Non-Marquee) ---
+    Text {
+      id: staticLabel
+      visible: !root.vertical && !root.barData.needsMarquee
+      anchors.centerIn: parent
+      text: root.barData.fullText
+      textFormat: Text.PlainText
+      color: button.active && button.useActiveColor ? button.activeColor : (root.barData.isLive ? Color.urgent : (root.barData.isSoon ? Color.warning : button.foreground))
+      font.family: button.fontFamily
+      font.pixelSize: button.fontSize
+      renderType: Text.NativeRendering
+      horizontalAlignment: Text.AlignHCenter
+      verticalAlignment: Text.AlignVCenter
     }
 
     // --- Custom Marquee Container (Horizontal Bar) ---

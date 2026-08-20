@@ -61,6 +61,114 @@ DEFAULT_CONFIG = {
     }
 }
 
+# --- Security, Size Bounds & Sanitization Helpers ---
+MAX_FEED_BYTES = 10 * 1024 * 1024  # 10 MiB limit per calendar feed
+MAX_EVENTS_PER_FEED = 5000
+
+ANSI_ESCAPE_RE = re.compile(
+    r"\x1b(?:\][^\x07\x1b]*(?:\x07|\x1b\\)?|\[[0-?]*[ -/]*[@-~]|[@-Z\\_])"
+)
+SCRIPT_STYLE_RE = re.compile(r"<(script|style)[^>]*>[\s\S]*?</\1>", re.IGNORECASE)
+HTML_TAG_RE = re.compile(r"<[^>]+>")
+HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$|^#[0-9a-fA-F]{8}$")
+ALLOWED_URL_SCHEMES = {"http", "https", "webcal", "zoommtg"}
+
+def strip_ansi(text: Any) -> str:
+    """Removes ANSI escape codes, OSC sequences, and terminal control codes."""
+    if not text:
+        return ""
+    return ANSI_ESCAPE_RE.sub("", str(text))
+
+def strip_control_chars(text: Any, multiline: bool = False) -> str:
+    """Removes non-printable C0 and C1 control characters (e.g. \\x00-\\x1f, \\x7f-\\x9f, \\r, \\b)."""
+    if not text:
+        return ""
+    res = []
+    for ch in str(text):
+        code = ord(ch)
+        if code == 10:  # \n
+            res.append("\n" if multiline else " ")
+        elif code in (9, 13):  # \t or \r
+            res.append(" ")
+        elif code < 32 or (127 <= code <= 159):
+            continue
+        else:
+            res.append(ch)
+    return "".join(res)
+
+def strip_html(text: Any) -> str:
+    """Strips HTML markup, scripts, and decodes common HTML entities to prevent rich text interpretation."""
+    if not text:
+        return ""
+    cleaned = SCRIPT_STYLE_RE.sub("", str(text))
+    cleaned = HTML_TAG_RE.sub("", cleaned)
+    cleaned = (
+        cleaned.replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", '"')
+        .replace("&#39;", "'")
+        .replace("&nbsp;", " ")
+    )
+    return cleaned
+
+def sanitize_text(text: Any, multiline: bool = False, max_len: Optional[int] = 2000) -> str:
+    """Sanitizes parsed calendar and feed fields (strips ANSI, HTML tags, control chars, normalizes spaces)."""
+    if not text:
+        return ""
+    s = strip_ansi(text)
+    s = strip_html(s)
+    s = strip_control_chars(s, multiline=multiline)
+    if not multiline:
+        s = " ".join(s.split())
+    else:
+        lines = [" ".join(line.split()) for line in s.splitlines()]
+        s = "\n".join(line for line in lines if line)
+    if max_len and len(s) > max_len:
+        s = s[:max_len]
+    return s.strip()
+
+def sanitize_terminal_output(text: Any) -> str:
+    """Sanitizes text before writing to terminal stdout/stderr to prevent terminal-control injection."""
+    if not text:
+        return ""
+    return strip_control_chars(strip_ansi(str(text)), multiline=False).strip()
+
+def sanitize_color(color: Any, default: str = "#4285F4") -> str:
+    """Validates and sanitizes a hex color string."""
+    if color and isinstance(color, str) and HEX_COLOR_RE.match(color.strip()):
+        return color.strip()
+    return default
+
+def is_safe_url(url: Any) -> bool:
+    """Ensures URL has an allowed safe scheme and does not start with a leading hyphen."""
+    if not url or not isinstance(url, str):
+        return False
+    u = url.strip()
+    if u.startswith("-"):
+        return False
+    try:
+        parsed = urllib.parse.urlsplit(u)
+        scheme = parsed.scheme.lower()
+        return scheme in ALLOWED_URL_SCHEMES and bool(parsed.netloc or parsed.path)
+    except Exception:
+        return False
+
+def read_bounded_stream(stream, max_bytes: int = MAX_FEED_BYTES) -> bytes:
+    """Reads a stream in chunks up to max_bytes, raising ValueError if exceeded to prevent memory exhaustion."""
+    chunks = []
+    total = 0
+    chunk_size = 65536
+    while total <= max_bytes:
+        chunk = stream.read(min(chunk_size, max_bytes - total + 1))
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise ValueError(f"Feed response exceeds maximum allowed size of {max_bytes} bytes")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
 # --- Video Conference Link Detection Patterns ---
 VIDEO_PATTERNS = [
     # Google Meet
@@ -267,12 +375,20 @@ def run_join_hooks(url: str, provider_id: str, summary: str):
     """Executes user-defined meeting-join hooks if present."""
     if os.path.isfile(HOOK_JOIN_SCRIPT) and os.access(HOOK_JOIN_SCRIPT, os.X_OK):
         try:
-            subprocess.Popen([HOOK_JOIN_SCRIPT, url, provider_id, summary], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            clean_url = sanitize_text(url, multiline=False)
+            clean_prov = sanitize_text(provider_id, multiline=False)
+            clean_sum = sanitize_text(summary, multiline=False)
+            subprocess.Popen([HOOK_JOIN_SCRIPT, clean_url, clean_prov, clean_sum], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception:
             pass
 
 def launch_url(url: str, provider_id: str = "web", summary: str = "Meeting"):
     """Opens meeting URL according to preferred browser, native app, and triggers automations."""
+    if not is_safe_url(url):
+        print(f"[omameet] Rejected unsafe meeting URL: {sanitize_terminal_output(url)}", file=sys.stderr)
+        return
+
+    clean_summary = sanitize_terminal_output(summary)
     config = load_config()
     settings = config.get("settings", {})
 
@@ -282,7 +398,7 @@ def launch_url(url: str, provider_id: str = "web", summary: str = "Meeting"):
     if settings.get("muteMicOnJoin", False):
         mute_microphone()
 
-    run_join_hooks(url, provider_id, summary)
+    run_join_hooks(url, provider_id, clean_summary)
 
     # Check for native app preferences (e.g. Zoom or Teams native apps)
     if settings.get("openInNativeApp", False):
@@ -291,12 +407,12 @@ def launch_url(url: str, provider_id: str = "web", summary: str = "Meeting"):
             m = re.search(r"zoom\.us/j/([0-9]+)", url)
             if m:
                 zoom_uri = f"zoommtg://zoom.us/join?confno={m.group(1)}"
-                subprocess.Popen(["zoom", zoom_uri], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.Popen(["zoom", "--", zoom_uri], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 return
 
     preferred_browser = settings.get("preferredBrowser", "").strip()
     if preferred_browser and shutil.which(preferred_browser):
-        subprocess.Popen([preferred_browser, url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.Popen([preferred_browser, "--", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
         subprocess.Popen(["xdg-open", url], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -316,15 +432,18 @@ def extract_meeting_info(location: str, description: str, url_field: str) -> Tup
         match = re.search(pattern, text_corpus, re.IGNORECASE)
         if match:
             url = match.group(0).rstrip(".,;)>]")
-            return url, prov_id, prov_name
+            if is_safe_url(url):
+                return url, prov_id, prov_name
 
     if location and re.match(r"^https?://[^\s]+$", location.strip(), re.IGNORECASE):
         url = location.strip().rstrip(".,;)>]")
-        return url, "web", "Meeting Link"
+        if is_safe_url(url):
+            return url, "web", "Meeting Link"
 
     if url_field and re.match(r"^https?://[^\s]+$", url_field.strip(), re.IGNORECASE):
         url = url_field.strip().rstrip(".,;)>]")
-        return url, "web", "Meeting Link"
+        if is_safe_url(url):
+            return url, "web", "Meeting Link"
 
     return None, None, None
 
@@ -424,7 +543,7 @@ def expand_recurring_events(event_dict: Dict[str, Any], window_start: datetime.d
 
     rule = parse_rrule(rrule_str)
     freq = rule.get("FREQ")
-    interval = int(rule.get("INTERVAL", "1"))
+    interval = max(1, int(rule.get("INTERVAL", "1")))
     count = int(rule.get("COUNT", "0")) if "COUNT" in rule else None
     until_str = rule.get("UNTIL")
     until_dt = None
@@ -517,7 +636,14 @@ def parse_ics_content(ics_text: str, feed_meta: Dict[str, Any], window_start: da
     exdates = []
     attendee_partstats = []
 
+    feed_id = sanitize_text(feed_meta.get("id", "default"), multiline=False, max_len=64) or "default"
+    feed_name = sanitize_text(feed_meta.get("name", "Calendar"), multiline=False, max_len=128) or "Calendar"
+    feed_color = sanitize_color(feed_meta.get("color", "#4285F4"))
+
     for line in lines:
+        if len(events) >= MAX_EVENTS_PER_FEED:
+            break
+
         if line.startswith("BEGIN:VEVENT"):
             in_event = True
             cur_props = {"exdates": []}
@@ -538,20 +664,34 @@ def parse_ics_content(ics_text: str, feed_meta: Dict[str, Any], window_start: da
                 else:
                     end_dt = start_dt + (datetime.timedelta(days=1) if is_all_day else datetime.timedelta(hours=1))
 
-                summary = unescape_ical_text(cur_props.get("SUMMARY", ("Untitled Event", {}))[0])
-                description = unescape_ical_text(cur_props.get("DESCRIPTION", ("", {}))[0])
-                location = unescape_ical_text(cur_props.get("LOCATION", ("", {}))[0])
-                url_field = cur_props.get("URL", ("", {}))[0]
-                status = cur_props.get("STATUS", ("CONFIRMED", {}))[0].upper()
+                raw_summary = unescape_ical_text(cur_props.get("SUMMARY", ("Untitled Event", {}))[0])
+                summary = sanitize_text(raw_summary, multiline=False, max_len=300) or "Untitled Event"
+
+                raw_desc = unescape_ical_text(cur_props.get("DESCRIPTION", ("", {}))[0])
+                description = sanitize_text(raw_desc, multiline=True, max_len=2000)
+
+                raw_loc = unescape_ical_text(cur_props.get("LOCATION", ("", {}))[0])
+                location = sanitize_text(raw_loc, multiline=False, max_len=300)
+
+                raw_url_field = cur_props.get("URL", ("", {}))[0]
+                url_field = sanitize_text(raw_url_field, multiline=False, max_len=500)
+
+                raw_status = cur_props.get("STATUS", ("CONFIRMED", {}))[0].upper()
+                status = sanitize_text(raw_status, multiline=False, max_len=32)
 
                 # Check if marked as cancelled or declined
                 is_declined = ("DECLINED" in attendee_partstats) or (status == "CANCELLED")
                 is_tentative = ("TENTATIVE" in attendee_partstats) or (status == "TENTATIVE")
                 is_pending = "NEEDS-ACTION" in attendee_partstats
 
-                organizer = unescape_ical_text(cur_props.get("ORGANIZER", ("", {}))[0])
-                uid = cur_props.get("UID", (f"evt_{len(events)}", {}))[0]
-                rrule = cur_props.get("RRULE", ("", {}))[0]
+                raw_org = unescape_ical_text(cur_props.get("ORGANIZER", ("", {}))[0])
+                organizer = sanitize_text(raw_org, multiline=False, max_len=200)
+
+                raw_uid = cur_props.get("UID", (f"evt_{len(events)}", {}))[0]
+                uid = sanitize_text(raw_uid, multiline=False, max_len=128)
+
+                raw_rrule = cur_props.get("RRULE", ("", {}))[0]
+                rrule = sanitize_text(raw_rrule, multiline=False, max_len=200)
 
                 video_url, provider_id, provider_name = extract_meeting_info(location, description, url_field)
 
@@ -569,9 +709,9 @@ def parse_ics_content(ics_text: str, feed_meta: Dict[str, Any], window_start: da
                     "provider_id": provider_id or "calendar",
                     "provider_name": provider_name or "Calendar",
                     "has_link": video_url is not None,
-                    "feed_id": feed_meta.get("id", "default"),
-                    "feed_name": feed_meta.get("name", "Calendar"),
-                    "feed_color": feed_meta.get("color", "#4285F4"),
+                    "feed_id": feed_id,
+                    "feed_name": feed_name,
+                    "feed_color": feed_color,
                     "organizer": organizer,
                     "rrule": rrule,
                     "exdates": exdates,
@@ -583,7 +723,8 @@ def parse_ics_content(ics_text: str, feed_meta: Dict[str, Any], window_start: da
 
                 if rrule:
                     expanded = expand_recurring_events(event_dict, window_start, window_end, local_tz)
-                    events.extend(expanded)
+                    avail_slots = MAX_EVENTS_PER_FEED - len(events)
+                    events.extend(expanded[:avail_slots])
                 else:
                     if end_dt >= window_start and start_dt <= window_end:
                         events.append(event_dict)
@@ -666,23 +807,41 @@ def fetch_feed_content(feed: Dict[str, Any]) -> str:
         file_path = os.path.expanduser(url.replace("file://", ""))
         if os.path.isdir(file_path):
             combined = ["BEGIN:VCALENDAR\nVERSION:2.0"]
-            for fname in os.listdir(file_path):
+            total_bytes = 0
+            file_count = 0
+            for fname in sorted(os.listdir(file_path)):
                 if fname.endswith(".ics"):
+                    file_count += 1
+                    if file_count > 100:
+                        break
                     fpath = os.path.join(file_path, fname)
                     try:
-                        with open(fpath, "r", encoding="utf-8", errors="ignore") as f:
-                            content = f.read()
-                            vevents = re.findall(r"BEGIN:VEVENT.*?END:VEVENT", content, re.DOTALL)
+                        fsize = os.path.getsize(fpath)
+                        if total_bytes + fsize > MAX_FEED_BYTES:
+                            raise ValueError(f"Directory total size exceeds limit of {MAX_FEED_BYTES} bytes")
+                        with open(fpath, "rb") as f:
+                            raw = read_bounded_stream(f, MAX_FEED_BYTES - total_bytes)
+                            total_bytes += len(raw)
+                            content = raw.decode("utf-8", errors="ignore")
+                            vevents = re.findall(r"BEGIN:VEVENT[\s\S]*?END:VEVENT", content)
                             combined.extend(vevents)
-                    except Exception:
-                        pass
+                    except Exception as ex:
+                        if isinstance(ex, ValueError):
+                            raise
             combined.append("END:VCALENDAR")
             return "\n".join(combined)
         elif os.path.isfile(file_path):
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-                return f.read()
+            fsize = os.path.getsize(file_path)
+            if fsize > MAX_FEED_BYTES:
+                raise ValueError(f"File size ({fsize} bytes) exceeds limit of {MAX_FEED_BYTES} bytes")
+            with open(file_path, "rb") as f:
+                raw = read_bounded_stream(f, MAX_FEED_BYTES)
+                return raw.decode("utf-8", errors="ignore")
         else:
             raise FileNotFoundError(f"Local file not found: {file_path}")
+
+    if not is_safe_url(url):
+        raise ValueError(f"Invalid or unsafe feed URL scheme: {sanitize_terminal_output(url)}")
 
     req = urllib.request.Request(
         url,
@@ -706,7 +865,11 @@ def fetch_feed_content(feed: Dict[str, Any]) -> str:
     https_handler = urllib.request.HTTPSHandler(context=ctx)
     opener = urllib.request.build_opener(SafeRedirectHandler(), https_handler)
     with opener.open(req, timeout=15) as response:
-        return response.read().decode("utf-8", errors="ignore")
+        cl = response.headers.get("Content-Length")
+        if cl and cl.isdigit() and int(cl) > MAX_FEED_BYTES:
+            raise ValueError(f"Feed response Content-Length ({cl} bytes) exceeds maximum limit of {MAX_FEED_BYTES} bytes")
+        raw_bytes = read_bounded_stream(response, MAX_FEED_BYTES)
+        return raw_bytes.decode("utf-8", errors="ignore")
 
 # --- Sync & State Builder ---
 
@@ -735,9 +898,10 @@ def run_sync() -> Dict[str, Any]:
                 feed_events = parse_ics_content(content, feed, window_start, window_end, local_tz)
                 all_events.extend(feed_events)
         except Exception as e:
-            feed_name = feed.get("name", feed.get("url", "Feed"))
-            feed_errors.append(f"{feed_name}: {str(e)}")
-            print(f"[omameet] Error syncing feed '{feed_name}': {e}", file=sys.stderr)
+            feed_name = sanitize_terminal_output(feed.get("name", feed.get("url", "Feed")))
+            err_msg = sanitize_terminal_output(str(e))
+            feed_errors.append(f"{feed_name}: {err_msg}")
+            print(f"[omameet] Error syncing feed '{feed_name}': {err_msg}", file=sys.stderr)
 
     hide_all_day = settings.get("hideAllDayEvents", False)
     hide_without_links = settings.get("hideWithoutLinks", False)
@@ -858,7 +1022,7 @@ def action_join_next():
         url = next_m["videoUrl"]
         prov = next_m.get("providerId", "web")
         summary = next_m.get("summary", "Meeting")
-        print(f"[omameet] Joining meeting: {summary} ({url})")
+        print(f"[omameet] Joining meeting: {sanitize_terminal_output(summary)} ({sanitize_terminal_output(url)})")
         launch_url(url, prov, summary)
         return True
 
@@ -867,7 +1031,7 @@ def action_join_next():
             url = evt["videoUrl"]
             prov = evt.get("providerId", "web")
             summary = evt.get("summary", "Meeting")
-            print(f"[omameet] Joining meeting: {summary} ({url})")
+            print(f"[omameet] Joining meeting: {sanitize_terminal_output(summary)} ({sanitize_terminal_output(url)})")
             launch_url(url, prov, summary)
             return True
 
@@ -887,9 +1051,10 @@ def action_create_instant(provider: str = None):
         "teams": "https://teams.microsoft.com/l/meetup-join/instant"
     }
     prov_key = str(provider).lower().strip()
-    url = urls.get(prov_key, urls["google"])
-    print(f"[omameet] Creating instant meeting ({prov_key}): {url}")
-    launch_url(url, prov_key, f"Instant {prov_key.capitalize()} Meeting")
+    clean_prov = sanitize_text(prov_key, multiline=False, max_len=32)
+    url = urls.get(clean_prov, urls["google"])
+    print(f"[omameet] Creating instant meeting ({clean_prov}): {sanitize_terminal_output(url)}")
+    launch_url(url, clean_prov, f"Instant {clean_prov.capitalize()} Meeting")
 
 def action_notify_check():
     config = load_config()
@@ -905,16 +1070,16 @@ def action_notify_check():
             continue
         to_start = evt.get("minutesToStart", 999)
         if 0 <= to_start <= lead_min and evt.get("status") in ("soon", "upcoming"):
-            summary = evt.get("summary", "Meeting")
-            start_time = evt.get("start", "")
-            prov = evt.get("providerName", "Video")
+            summary = sanitize_terminal_output(evt.get("summary", "Meeting"))
+            start_time = sanitize_terminal_output(evt.get("start", ""))
+            prov = sanitize_terminal_output(evt.get("providerName", "Video"))
             url = evt.get("videoUrl", "")
 
             msg = f"Starts at {start_time} (in {to_start} min) • {prov}"
             icon = "calendar"
 
             cmd = ["notify-send", "-a", "omameet", "-i", icon, f"📅 {summary}", msg]
-            if url:
+            if url and is_safe_url(url):
                 cmd.extend(["--action=join=Join Meeting"])
             try:
                 subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -933,32 +1098,37 @@ def action_list():
 
     if next_m:
         status_icon = "🔴 LIVE" if next_m.get("status") == "ongoing" else f"⏳ in {next_m.get('minutesToStart')}m"
-        print(f"\033[1;32m👉 Next Meeting:\033[0m {next_m.get('summary')} ({next_m.get('start')} - {next_m.get('end')}) [{status_icon}]")
+        clean_sum = sanitize_terminal_output(next_m.get('summary'))
+        clean_start = sanitize_terminal_output(next_m.get('start'))
+        clean_end = sanitize_terminal_output(next_m.get('end'))
+        print(f"\033[1;32m👉 Next Meeting:\033[0m {clean_sum} ({clean_start} - {clean_end}) [{status_icon}]")
         if next_m.get("videoUrl"):
-            print(f"   \033[34mLink:\033[0m {next_m.get('videoUrl')} ({next_m.get('providerName')})")
+            clean_url = sanitize_terminal_output(next_m.get('videoUrl'))
+            clean_prov = sanitize_terminal_output(next_m.get('providerName'))
+            print(f"   \033[34mLink:\033[0m {clean_url} ({clean_prov})")
         print()
 
     print(f"\033[1m📅 Today ({len(today)} events):\033[0m")
     if not today:
         print("  \033[90m(No events scheduled for today)\033[0m")
     for e in today:
-        link_badge = f"\033[34m[{e.get('providerName')}]\033[0m" if e.get("hasLink") else ""
+        link_badge = f"\033[34m[{sanitize_terminal_output(e.get('providerName'))}]\033[0m" if e.get("hasLink") else ""
         status_tag = f"\033[33m({e.get('status')})\033[0m" if e.get("status") in ("ongoing", "soon") else ""
-        time_str = "All Day" if e.get("isAllDay") else f"{e.get('start')} - {e.get('end')}"
-        print(f"  • \033[1m{time_str}\033[0m: {e.get('summary')} {link_badge} {status_tag}")
+        time_str = "All Day" if e.get("isAllDay") else f"{sanitize_terminal_output(e.get('start'))} - {sanitize_terminal_output(e.get('end'))}"
+        print(f"  • \033[1m{time_str}\033[0m: {sanitize_terminal_output(e.get('summary'))} {link_badge} {status_tag}")
 
     print(f"\n\033[1m📅 Tomorrow ({len(tomorrow)} events):\033[0m")
     if not tomorrow:
         print("  \033[90m(No events scheduled for tomorrow)\033[0m")
     for e in tomorrow:
-        link_badge = f"\033[34m[{e.get('providerName')}]\033[0m" if e.get("hasLink") else ""
-        time_str = "All Day" if e.get("isAllDay") else f"{e.get('start')} - {e.get('end')}"
-        print(f"  • \033[1m{time_str}\033[0m: {e.get('summary')} {link_badge}")
+        link_badge = f"\033[34m[{sanitize_terminal_output(e.get('providerName'))}]\033[0m" if e.get("hasLink") else ""
+        time_str = "All Day" if e.get("isAllDay") else f"{sanitize_terminal_output(e.get('start'))} - {sanitize_terminal_output(e.get('end'))}"
+        print(f"  • \033[1m{time_str}\033[0m: {sanitize_terminal_output(e.get('summary'))} {link_badge}")
 
     if bookmarks:
         print(f"\n\033[1m🔖 Bookmarks & Quick Rooms ({len(bookmarks)}):\033[0m")
         for b in bookmarks:
-            print(f"  • \033[1m{b.get('name')}\033[0m: {b.get('url')}")
+            print(f"  • \033[1m{sanitize_terminal_output(b.get('name'))}\033[0m: {sanitize_terminal_output(b.get('url'))}")
     print()
 
 def main():
@@ -984,9 +1154,9 @@ def main():
         else:
             url = sys.argv[2]
         if copy_to_clipboard(url):
-            print(f"[omameet] Copied meeting link to clipboard: {url}")
+            print(f"[omameet] Copied meeting link to clipboard: {sanitize_terminal_output(url)}")
         else:
-            print(f"[omameet] Unable to copy (wl-copy or xclip not found): {url}")
+            print(f"[omameet] Unable to copy (wl-copy or xclip not found): {sanitize_terminal_output(url)}")
 
     elif cmd in ("mute-mic", "mute"):
         mute_microphone()
@@ -1009,7 +1179,11 @@ def main():
         else:
             nm = state.get("nextMeeting")
             if nm:
-                print(f"{nm.get('summary')} ({nm.get('start')} - {nm.get('end')}) - {nm.get('providerName')}")
+                s_sum = sanitize_terminal_output(nm.get('summary'))
+                s_start = sanitize_terminal_output(nm.get('start'))
+                s_end = sanitize_terminal_output(nm.get('end'))
+                s_prov = sanitize_terminal_output(nm.get('providerName'))
+                print(f"{s_sum} ({s_start} - {s_end}) - {s_prov}")
             else:
                 print("No upcoming meetings")
 
@@ -1096,9 +1270,12 @@ def main():
         if len(sys.argv) < 4:
             print("Usage: omameet add-feed <name> <url> [hex_color]", file=sys.stderr)
             sys.exit(1)
-        name = sys.argv[2]
-        url = sys.argv[3]
-        color = sys.argv[4] if len(sys.argv) > 4 else "#4285F4"
+        name = sanitize_text(sys.argv[2], multiline=False, max_len=128)
+        url = sys.argv[3].strip()
+        color = sanitize_color(sys.argv[4] if len(sys.argv) > 4 else "#4285F4")
+        if not is_safe_url(url) and not (url.startswith("file://") or url.startswith("/") or url.startswith("~")):
+            print(f"[omameet] Error: Invalid calendar URL scheme: {sanitize_terminal_output(url)}", file=sys.stderr)
+            sys.exit(1)
         cfg = load_config()
         feed_id = f"feed_{int(datetime.datetime.now().timestamp())}"
         cfg["feeds"].append({
@@ -1109,7 +1286,7 @@ def main():
             "enabled": True
         })
         save_config(cfg)
-        print(f"[omameet] Calendar '{name}' added successfully! Syncing...")
+        print(f"[omameet] Calendar '{sanitize_terminal_output(name)}' added successfully! Syncing...")
         run_sync()
 
     elif cmd in ("remove-feed", "rm"):
@@ -1120,7 +1297,7 @@ def main():
         cfg = load_config()
         cfg["feeds"] = [f for f in cfg["feeds"] if f.get("id") != target and f.get("name") != target]
         save_config(cfg)
-        print(f"[omameet] Calendar '{target}' removed.")
+        print(f"[omameet] Calendar '{sanitize_terminal_output(target)}' removed.")
         run_sync()
 
     elif cmd in ("list-feeds", "feeds"):
@@ -1132,22 +1309,28 @@ def main():
             print(f"\n\033[1mConfigured Calendars ({len(feeds)}):\033[0m")
             for f in feeds:
                 status = "✓ Active" if f.get("enabled", True) else "✗ Disabled"
-                print(f"  • [{f.get('id')}] \033[1m{f.get('name')}\033[0m: {f.get('url')} ({status})")
+                s_id = sanitize_terminal_output(f.get('id'))
+                s_name = sanitize_terminal_output(f.get('name'))
+                s_url = sanitize_terminal_output(f.get('url'))
+                print(f"  • [{s_id}] \033[1m{s_name}\033[0m: {s_url} ({status})")
             print()
 
     elif cmd in ("add-bookmark", "bookmark"):
         if len(sys.argv) < 4:
             print("Usage: omameet add-bookmark <name> <url>", file=sys.stderr)
             sys.exit(1)
-        name = sys.argv[2]
-        url = sys.argv[3]
+        name = sanitize_text(sys.argv[2], multiline=False, max_len=128)
+        url = sys.argv[3].strip()
+        if not is_safe_url(url):
+            print(f"[omameet] Error: Invalid bookmark URL scheme: {sanitize_terminal_output(url)}", file=sys.stderr)
+            sys.exit(1)
         cfg = load_config()
         if "bookmarks" not in cfg:
             cfg["bookmarks"] = []
         bm_id = f"bm_{int(datetime.datetime.now().timestamp())}"
         cfg["bookmarks"].append({"id": bm_id, "name": name, "url": url})
         save_config(cfg)
-        print(f"[omameet] Bookmark '{name}' added!")
+        print(f"[omameet] Bookmark '{sanitize_terminal_output(name)}' added!")
         run_sync()
 
     elif cmd in ("remove-bookmark", "rm-bm"):
@@ -1158,7 +1341,7 @@ def main():
         cfg = load_config()
         cfg["bookmarks"] = [b for b in cfg.get("bookmarks", []) if b.get("id") != target and b.get("name") != target]
         save_config(cfg)
-        print(f"[omameet] Bookmark '{target}' removed.")
+        print(f"[omameet] Bookmark '{sanitize_terminal_output(target)}' removed.")
         run_sync()
 
     elif cmd in ("list-bookmarks", "bookmarks"):
@@ -1169,7 +1352,10 @@ def main():
         else:
             print(f"\n\033[1mSaved Bookmarks ({len(bms)}):\033[0m")
             for b in bms:
-                print(f"  • [{b.get('id')}] \033[1m{b.get('name')}\033[0m: {b.get('url')}")
+                s_id = sanitize_terminal_output(b.get('id'))
+                s_name = sanitize_terminal_output(b.get('name'))
+                s_url = sanitize_terminal_output(b.get('url'))
+                print(f"  • [{s_id}] \033[1m{s_name}\033[0m: {s_url}")
             print()
 
     elif cmd in ("get-config", "config"):
@@ -1198,7 +1384,7 @@ def main():
             cfg["settings"] = {}
         cfg["settings"][key] = val
         save_config(cfg)
-        print(f"[omameet] Setting '{key}' updated to {val}")
+        print(f"[omameet] Setting '{sanitize_terminal_output(key)}' updated to {val}")
 
     elif cmd in ("help", "h"):
         print("""
