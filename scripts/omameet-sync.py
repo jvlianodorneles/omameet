@@ -854,6 +854,13 @@ def fetch_feed_content(feed: Dict[str, Any]) -> str:
     username = feed.get("username")
     password = feed.get("password")
     if username and password:
+        parsed_url = urllib.parse.urlsplit(url)
+        is_tls = (parsed_url.scheme.lower() == "https")
+        is_loopback = (parsed_url.hostname or "").lower() in ("localhost", "127.0.0.1", "::1")
+        if not (is_tls or is_loopback):
+            raise ValueError(
+                f"Refusing to transmit Basic Auth credentials over unencrypted HTTP without TLS ({sanitize_terminal_output(url)}). Please configure an HTTPS calendar URL."
+            )
         auth_header = "Basic " + base64.b64encode(f"{username}:{password}".encode()).decode()
         req.add_header("Authorization", auth_header)
 

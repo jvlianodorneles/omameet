@@ -244,6 +244,28 @@ class TestRedirectSecurity(unittest.TestCase):
         self.assertIn("Authorization", new_req.headers)
         self.assertEqual(new_req.headers["Authorization"], "Basic dXNlcjpwYXNz")
 
+class TestTlsCredentialSecurity(unittest.TestCase):
+    def test_http_with_credentials_raises_error(self):
+        feed = {
+            "id": "test_http_cred",
+            "url": "http://calendar.company.com/feed.ics",
+            "username": "user",
+            "password": "secretpassword"
+        }
+        with self.assertRaises(ValueError) as ctx:
+            omameet.fetch_feed_content(feed)
+        self.assertIn("Refusing to transmit Basic Auth credentials over unencrypted HTTP without TLS", str(ctx.exception))
+
+    def test_http_without_credentials_does_not_raise_tls_error(self):
+        feed = {
+            "id": "test_http_no_cred",
+            "url": "http://invalid-or-nonexistent-domain-123456789.test/feed.ics"
+        }
+        try:
+            omameet.fetch_feed_content(feed)
+        except Exception as e:
+            self.assertNotIn("Refusing to transmit Basic Auth credentials", str(e))
+
 class TestQmlPlainTextRendering(unittest.TestCase):
     def test_all_text_elements_in_qml_enforce_plain_text(self):
         import re
